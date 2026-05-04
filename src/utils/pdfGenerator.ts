@@ -2565,7 +2565,7 @@ export const generatePDF = async (data: DocumentData) => {
           }
         </style>
       </head>
-      <body>
+      <body${data.type === 'receipt' ? ' class="receipt-document"' : ''}>
         ${pagesHtml}
       </body>
       </html>
@@ -3041,7 +3041,36 @@ export const generatePDF = async (data: DocumentData) => {
           font-size: 10px;
           color: #000;
         }
-        
+
+        /* Receipt-specific bottom spacing fix to prevent blank pages */
+        body.receipt-document .footer {
+          margin-top: 6px;
+          margin-bottom: 0;
+          padding-top: 6px;
+          padding-bottom: 0;
+          page-break-after: auto;
+        }
+
+        body.receipt-document .page:last-of-type {
+          padding-bottom: 15mm;
+          margin-bottom: 0;
+          page-break-after: auto;
+        }
+
+        body.receipt-document .payment-details-table:last-of-type {
+          margin-bottom: 0;
+        }
+
+        /* Further spacing reduction for receipts */
+        body.receipt-document .totals-section {
+          margin-bottom: 4px;
+          margin-top: 4px;
+        }
+
+        body.receipt-document .items-section {
+          margin-bottom: 4px;
+        }
+
         .delivery-info-section {
           margin: 6px 0;
           padding: 8px;
@@ -3369,7 +3398,7 @@ export const generatePDF = async (data: DocumentData) => {
 
         <!-- Payment Details Section (for receipts) -->
         ${data.type === 'receipt' ? `
-        <div class="payment-section" style="margin-top: 25px; border-top: 2px solid #000; padding-top: 15px;">
+        <div class="payment-section" style="margin-top: 8px; border-top: 2px solid #000; padding-top: 8px;">
           <!-- Invoice Particulars Table -->
           ${data.items && data.items.length > 0 ? `
           <div style="margin-bottom: 20px;">
