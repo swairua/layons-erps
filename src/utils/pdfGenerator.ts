@@ -3716,6 +3716,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       showCalculatedValuesInTerms: false, // Never show calculated values in invoice terms
       customTitle: 'INVOICE',
       project_title: projectTitle || undefined,
+      display_as_percentage: invoice.display_as_percentage || false,
     };
   } else {
     documentData = {
@@ -3745,6 +3746,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       showCalculatedValuesInTerms: false, // Never show calculated values in invoice terms
       customTitle: 'INVOICE',
       project_title: projectTitle || undefined,
+      display_as_percentage: invoice.display_as_percentage || false,
     };
   }
 
@@ -3833,6 +3835,7 @@ export const downloadQuotationPDF = async (quotation: any, company?: CompanyDeta
       total_amount: quotation.total_amount,
       notes: quotation.notes,
       terms_and_conditions: quotation.terms_and_conditions,
+      display_as_percentage: quotation.display_as_percentage || false,
     };
   } else {
     documentData = {
@@ -3856,6 +3859,7 @@ export const downloadQuotationPDF = async (quotation: any, company?: CompanyDeta
       total_amount: quotation.total_amount,
       notes: quotation.notes,
       terms_and_conditions: quotation.terms_and_conditions,
+      display_as_percentage: quotation.display_as_percentage || false,
     };
   }
 
