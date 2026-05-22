@@ -66,6 +66,8 @@ export async function saveBoqDraft(
       return { success: false, error: 'User ID and Company ID are required' };
     }
 
+    console.log(`[saveBoqDraft] Attempting upsert for company: ${companyId}, user: ${userId}`);
+
     // Prepare the payload matching the boq_drafts table schema
     const payload = {
       company_id: companyId,
@@ -107,20 +109,22 @@ export async function saveBoqDraft(
       .single();
 
     if (error) {
-      console.error('Failed to save BOQ draft:', error);
+      console.error('[saveBoqDraft] Upsert failed:', error);
       return { success: false, error: error.message };
     }
 
+    console.log(`[saveBoqDraft] Successfully saved/updated draft with ID: ${data?.id}`);
     return { success: true, draftId: data?.id };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error saving BOQ draft:', errorMsg);
+    console.error('[saveBoqDraft] Unexpected error:', errorMsg);
     return { success: false, error: errorMsg };
   }
 }
 
 /**
  * Load the latest draft for a user and company.
+ * Fetches the most recent draft (by updated_at) to handle duplicate edge cases.
  * Returns null if no draft exists.
  */
 export async function loadBoqDraft(
@@ -133,26 +137,37 @@ export async function loadBoqDraft(
       return null;
     }
 
+    console.log(`[loadBoqDraft] Attempting to load draft for user: ${userId}, company: ${companyId}`);
+
     const { data, error } = await supabase
       .from('boq_drafts')
       .select('*')
       .eq('user_id', userId)
       .eq('company_id', companyId)
-      .single();
+      .is('boq_id', null) // Only fetch create drafts, not edit drafts
+      .order('updated_at', { ascending: false }) // Get the most recent
+      .limit(1); // Only fetch one row
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows found - this is expected when no draft exists
-        return null;
-      }
-      console.error('Failed to load BOQ draft:', error);
+      console.error('[loadBoqDraft] Query error:', error);
       return null;
     }
 
-    return data as BOQDraftRecord;
+    if (!data || data.length === 0) {
+      console.log('[loadBoqDraft] No draft found for this user/company');
+      return null;
+    }
+
+    // Log if we found duplicates (shouldn't happen after constraint fix)
+    if (data.length > 1) {
+      console.warn(`[loadBoqDraft] Found ${data.length} draft rows (should be max 1). Using most recent.`);
+    }
+
+    console.log(`[loadBoqDraft] Successfully loaded draft, last saved at: ${data[0].updated_at}`);
+    return data[0] as BOQDraftRecord;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error loading BOQ draft:', errorMsg);
+    console.error('[loadBoqDraft] Unexpected error:', errorMsg);
     return null;
   }
 }
@@ -170,21 +185,25 @@ export async function deleteDraft(
       return { success: false, error: 'User ID and Company ID are required' };
     }
 
+    console.log(`[deleteDraft] Deleting draft for user: ${userId}, company: ${companyId}`);
+
     const { error } = await supabase
       .from('boq_drafts')
       .delete()
       .eq('user_id', userId)
-      .eq('company_id', companyId);
+      .eq('company_id', companyId)
+      .eq('boq_id', null); // Only delete create drafts
 
     if (error) {
-      console.error('Failed to delete BOQ draft:', error);
+      console.error('[deleteDraft] Failed to delete BOQ draft:', error);
       return { success: false, error: error.message };
     }
 
+    console.log('[deleteDraft] Successfully deleted draft');
     return { success: true };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error deleting BOQ draft:', errorMsg);
+    console.error('[deleteDraft] Error deleting BOQ draft:', errorMsg);
     return { success: false, error: errorMsg };
   }
 }
@@ -434,5 +453,65 @@ export async function hasDraft(
   } catch (err) {
     console.error('Error checking for draft:', err);
     return false;
+  }
+}
+
+/**
+ * Clean up duplicate draft rows, keeping only the most recent one.
+ * This handles the edge case where duplicate drafts were created
+ * before the UNIQUE constraint was properly applied.
+ *
+ * Should only be called if duplicates are detected.
+ */
+export async function cleanupDuplicateDrafts(
+  userId: string,
+  companyId: string
+): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+  try {
+    if (!userId || !companyId) {
+      return { success: false, error: 'User ID and Company ID are required' };
+    }
+
+    console.log(`[cleanupDuplicateDrafts] Checking for duplicates for user: ${userId}, company: ${companyId}`);
+
+    // Fetch all create drafts for this user/company, sorted by updated_at DESC
+    const { data: allDrafts, error: fetchError } = await supabase
+      .from('boq_drafts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .is('boq_id', null)
+      .order('updated_at', { ascending: false });
+
+    if (fetchError) {
+      console.error('[cleanupDuplicateDrafts] Failed to fetch drafts:', fetchError);
+      return { success: false, error: fetchError.message };
+    }
+
+    if (!allDrafts || allDrafts.length <= 1) {
+      console.log('[cleanupDuplicateDrafts] No duplicates found');
+      return { success: true, deletedCount: 0 };
+    }
+
+    // Keep the first (most recent) and delete the rest
+    const draftIdsToDelete = allDrafts.slice(1).map(d => d.id);
+    console.log(`[cleanupDuplicateDrafts] Found ${draftIdsToDelete.length} duplicate drafts to delete`);
+
+    const { error: deleteError } = await supabase
+      .from('boq_drafts')
+      .delete()
+      .in('id', draftIdsToDelete);
+
+    if (deleteError) {
+      console.error('[cleanupDuplicateDrafts] Failed to delete duplicates:', deleteError);
+      return { success: false, error: deleteError.message };
+    }
+
+    console.log(`[cleanupDuplicateDrafts] Successfully deleted ${draftIdsToDelete.length} duplicate drafts`);
+    return { success: true, deletedCount: draftIdsToDelete.length };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[cleanupDuplicateDrafts] Error:', errorMsg);
+    return { success: false, error: errorMsg };
   }
 }

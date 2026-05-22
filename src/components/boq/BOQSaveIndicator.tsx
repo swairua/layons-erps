@@ -5,13 +5,24 @@ interface BOQSaveIndicatorProps {
   isSaving: boolean;
   lastSavedTime: string | null;
   hasUnsavedChanges: boolean;
+  saveError?: string | null;
 }
 
 export function BOQSaveIndicator({
   isSaving,
   lastSavedTime,
   hasUnsavedChanges,
+  saveError,
 }: BOQSaveIndicatorProps) {
+  if (saveError) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-red-600">
+        <AlertCircle className="h-4 w-4" />
+        <span title={saveError}>Save failed</span>
+      </div>
+    );
+  }
+
   if (isSaving) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
