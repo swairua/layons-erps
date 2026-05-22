@@ -100,7 +100,7 @@ export function CreateUserModal({
     setFormErrors({});
   };
 
-  const handleInputChange = (field: keyof CreateUserData) => (
+  const handleInputChange = (field: keyof (CreateUserData & { password: string })) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
