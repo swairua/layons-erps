@@ -110,6 +110,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
   const todayISO = new Date().toISOString().split('T')[0];
@@ -189,6 +190,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
     try {
       setIsSavingDraft(true);
+      setSaveError(null);
       const selectedCustomer = customers.find(c => c.id === formData.clientId);
       const result = await saveBoqDraft(profile.id, currentCompany.id, {
         boqNumber: formData.boqNumber,
@@ -213,9 +215,14 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       if (result.success) {
         setLastAutosavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         setHasUnsavedChanges(false);
+      } else {
+        setSaveError(result.error || 'Failed to save draft');
+        console.error('Autosave failed:', result.error);
       }
     } catch (err) {
-      console.log('Failed to save draft:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      setSaveError(errorMsg);
+      console.error('Failed to save draft:', err);
     } finally {
       setIsSavingDraft(false);
     }
@@ -557,7 +564,6 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     } else {
       toast.success('Form cleared');
     }
-    setDraftSaved(false);
   };
 
   return (
@@ -575,7 +581,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
               )}
             </div>
             <div className="flex items-center space-x-4">
-              {draftSaved && (
+              {isSavingDraft && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <Check className="h-4 w-4" />
                   <span className="text-sm font-medium">Autosaving...</span>
@@ -833,6 +839,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
               isSaving={isSavingDraft}
               lastSavedTime={lastAutosavedAt}
               hasUnsavedChanges={hasUnsavedChanges}
+              saveError={saveError}
             />
           </div>
           <div className="space-x-2">
