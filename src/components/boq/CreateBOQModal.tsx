@@ -217,7 +217,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     } catch (err) {
       console.log('Failed to save draft:', err);
     }
-  }, 2000);
+  }, 5000);
 
   // Autosave whenever form state changes
   useEffect(() => {
