@@ -12,17 +12,6 @@ export function BOQSaveIndicator({
   lastSavedTime,
   hasUnsavedChanges,
 }: BOQSaveIndicatorProps) {
-  const [displayTime, setDisplayTime] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (lastSavedTime) {
-      const date = new Date(lastSavedTime);
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      setDisplayTime(`${hours}:${minutes}`);
-    }
-  }, [lastSavedTime]);
-
   if (isSaving) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -41,11 +30,11 @@ export function BOQSaveIndicator({
     );
   }
 
-  if (displayTime) {
+  if (lastSavedTime) {
     return (
       <div className="flex items-center gap-2 text-sm text-green-600">
         <CheckCircle2 className="h-4 w-4" />
-        <span>Saved at {displayTime}</span>
+        <span>Saved at {lastSavedTime}</span>
       </div>
     );
   }
