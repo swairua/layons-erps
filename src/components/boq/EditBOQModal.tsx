@@ -120,7 +120,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  const [editSaveError, setEditSaveError] = useState<string | null>(null);
   const unsavedChangesRef = useRef(false);
+  const pendingChangesRef = useRef<any>({});
 
   const [boqNumber, setBoqNumber] = useState('');
   const [boqDate, setBoqDate] = useState('');
@@ -137,48 +139,60 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
   const selectedClient = useMemo(() => customers.find(c => c.id === clientId), [customers, clientId]);
 
-  // Autosave function
+  // Autosave function - uses fresh data from pendingChangesRef
   const performAutosave = useCallback(async () => {
     if (!boq?.id || !profile?.id || !currentCompany?.id) return;
 
     setIsSaving(true);
+    setEditSaveError(null);
     try {
-      const filledSections = getFilledItems();
+      const changes = pendingChangesRef.current;
+
+      // Build filled sections from the ref data
+      const filledSections = (changes.sections || []).map((s: any) => ({
+        ...s,
+        subsections: (s.subsections || []).map((sub: any) => ({
+          ...sub,
+          items: (sub.items || []).filter((i: any) => {
+            return i.description.trim() || (i.quantity && Number(i.quantity) > 0) || (i.rate && Number(i.rate) > 0);
+          })
+        }))
+      }));
 
       let filledSubtotal = 0;
-      filledSections.forEach(sec => {
-        sec.subsections.forEach(sub => {
-          sub.items.forEach(item => {
+      filledSections.forEach((sec: any) => {
+        sec.subsections.forEach((sub: any) => {
+          sub.items.forEach((item: any) => {
             filledSubtotal += (item.quantity || 0) * (item.rate || 0);
           });
         });
       });
 
       const draftData = {
-        number: boqNumber,
-        boq_date: boqDate,
-        due_date: dueDate,
-        customer_id: clientId,
-        client_name: selectedClient?.name || '',
-        client_email: selectedClient?.email || null,
-        client_phone: selectedClient?.phone || null,
-        client_address: selectedClient?.address || null,
-        client_city: selectedClient?.city || null,
-        client_country: selectedClient?.country || null,
-        contractor: contractor || null,
-        project_title: projectTitle || null,
-        currency: currency,
+        number: changes.boqNumber,
+        boq_date: changes.boqDate,
+        due_date: changes.dueDate,
+        customer_id: changes.clientId,
+        client_name: changes.selectedClientName || '',
+        client_email: changes.selectedClientEmail || null,
+        client_phone: changes.selectedClientPhone || null,
+        client_address: changes.selectedClientAddress || null,
+        client_city: changes.selectedClientCity || null,
+        client_country: changes.selectedClientCountry || null,
+        contractor: changes.contractor || null,
+        project_title: changes.projectTitle || null,
+        currency: changes.currency,
         subtotal: filledSubtotal,
         tax_amount: 0,
         total_amount: filledSubtotal,
         data: {
-          sections: filledSections.map(s => ({
+          sections: filledSections.map((s: any) => ({
             title: s.title,
-            subsections: s.subsections.map(sub => ({
+            subsections: s.subsections.map((sub: any) => ({
               name: sub.name,
               label: sub.label,
-              items: sub.items.map(i => {
-                const unitObj = units.find((u: any) => u.id === i.unit);
+              items: sub.items.map((i: any) => {
+                const unitObj = changes.units.find((u: any) => u.id === i.unit);
                 return {
                   description: i.description,
                   quantity: i.quantity,
@@ -189,10 +203,10 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
               })
             }))
           })),
-          notes: notes,
+          notes: changes.notes,
         },
-        terms_and_conditions: termsAndConditions || null,
-        show_calculated_values_in_terms: showCalculatedValuesInTerms,
+        terms_and_conditions: changes.termsAndConditions || null,
+        show_calculated_values_in_terms: changes.showCalculatedValuesInTerms,
       };
 
       const result = await saveEditingDraft(profile.id, currentCompany.id, boq.id, draftData);
@@ -201,15 +215,43 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         setLastSavedTime(new Date().toISOString());
         setHasUnsavedChanges(false);
         unsavedChangesRef.current = false;
+        setEditSaveError(null);
       } else {
         console.error('Autosave failed:', result.error);
+        setEditSaveError(result.error || 'Failed to save draft');
       }
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error('Error during autosave:', err);
+      setEditSaveError(errorMsg);
     } finally {
       setIsSaving(false);
     }
-  }, [boq?.id, profile?.id, currentCompany?.id, boqNumber, boqDate, dueDate, clientId, selectedClient, contractor, projectTitle, currency, units, notes, termsAndConditions, showCalculatedValuesInTerms]);
+  }, [boq?.id, profile?.id, currentCompany?.id]);
+
+  // Keep pendingChangesRef in sync with all form state
+  useEffect(() => {
+    pendingChangesRef.current = {
+      boqNumber,
+      boqDate,
+      dueDate,
+      clientId,
+      selectedClientName: selectedClient?.name,
+      selectedClientEmail: selectedClient?.email,
+      selectedClientPhone: selectedClient?.phone,
+      selectedClientAddress: selectedClient?.address,
+      selectedClientCity: selectedClient?.city,
+      selectedClientCountry: selectedClient?.country,
+      contractor,
+      projectTitle,
+      currency,
+      units,
+      notes,
+      termsAndConditions,
+      showCalculatedValuesInTerms,
+      sections,
+    };
+  }, [boqNumber, boqDate, dueDate, clientId, selectedClient, contractor, projectTitle, currency, units, notes, termsAndConditions, showCalculatedValuesInTerms, sections]);
 
   // Debounce autosave to 5 seconds
   const debouncedAutosave = useDebounce(performAutosave, 5000);
@@ -796,6 +838,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
             isSaving={isSaving}
             lastSavedTime={lastSavedTime}
             hasUnsavedChanges={hasUnsavedChanges}
+            saveError={editSaveError}
           />
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => {

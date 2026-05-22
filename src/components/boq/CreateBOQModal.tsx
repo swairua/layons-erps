@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -111,10 +111,12 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  const [authReadyError, setAuthReadyError] = useState<string | null>(null);
 
   const pendingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingFormDataRef = useRef<any>(null);
   const lastProfileRef = useRef(profile);
+  const formStateRef = useRef<any>({});
 
   const todayISO = new Date().toISOString().split('T')[0];
   const defaultNumber = useMemo(() => {
@@ -207,13 +209,16 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   // Autosave implementation with flush capability
   const performAutosave = async (formData: any) => {
     if (!currentCompany?.id || !profile?.id) {
-      console.warn('[CreateBOQModal] Autosave aborted: missing company or profile ID', { companyId: currentCompany?.id, profileId: profile?.id });
+      const reason = !currentCompany?.id ? 'Company not loaded yet' : 'Auth not ready yet';
+      console.warn('[CreateBOQModal] Autosave deferred: ' + reason, { companyId: currentCompany?.id, profileId: profile?.id });
+      setAuthReadyError(reason);
       return;
     }
 
     try {
       setIsSavingDraft(true);
       setSaveError(null);
+      setAuthReadyError(null);
       const selectedCustomer = customers.find(c => c.id === formData.clientId);
       const result = await saveBoqDraft(profile.id, currentCompany.id, {
         boqNumber: formData.boqNumber,
@@ -251,67 +256,53 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     }
   };
 
-  // Create debounced autosave function with manual flush capability
-  const debouncedAutoSave = (formData: any) => {
-    pendingFormDataRef.current = formData;
-
+  // Create debounced autosave function with manual flush capability (memoized for stability)
+  const debouncedAutoSave = useCallback(() => {
     if (pendingTimeoutRef.current) {
       clearTimeout(pendingTimeoutRef.current);
     }
 
     pendingTimeoutRef.current = setTimeout(() => {
-      if (pendingFormDataRef.current) {
-        performAutosave(pendingFormDataRef.current);
-        pendingFormDataRef.current = null;
+      if (formStateRef.current) {
+        performAutosave(formStateRef.current);
       }
     }, 5000);
-  };
+  }, [performAutosave]);
 
   // Flush pending autosave when modal closes
-  const flushPendingAutosave = async () => {
+  const flushPendingAutosave = useCallback(async () => {
     if (pendingTimeoutRef.current) {
       clearTimeout(pendingTimeoutRef.current);
       pendingTimeoutRef.current = null;
     }
-    if (pendingFormDataRef.current) {
-      await performAutosave(pendingFormDataRef.current);
-      pendingFormDataRef.current = null;
+    if (formStateRef.current && Object.keys(formStateRef.current).length > 0) {
+      await performAutosave(formStateRef.current);
     }
-  };
+  }, [performAutosave]);
 
-  // Autosave whenever form state changes
+  // Sync form state to ref whenever it changes
   useEffect(() => {
-    if (open) {
-      const formData = {
-        boqNumber,
-        boqDate,
-        dueDate,
-        clientId,
-        projectTitle,
-        contractor,
-        notes,
-        termsAndConditions,
-        showCalculatedValuesInTerms,
-        currency,
-        sections,
-      };
-      debouncedAutoSave(formData);
+    formStateRef.current = {
+      boqNumber,
+      boqDate,
+      dueDate,
+      clientId,
+      projectTitle,
+      contractor,
+      notes,
+      termsAndConditions,
+      showCalculatedValuesInTerms,
+      currency,
+      sections,
+    };
+  }, [boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections]);
+
+  // Autosave whenever form state changes (only depends on open and debouncedAutoSave)
+  useEffect(() => {
+    if (open && Object.keys(formStateRef.current).length > 0) {
+      debouncedAutoSave();
     }
-  }, [
-    open,
-    boqNumber,
-    boqDate,
-    dueDate,
-    clientId,
-    projectTitle,
-    contractor,
-    notes,
-    termsAndConditions,
-    showCalculatedValuesInTerms,
-    currency,
-    sections,
-    debouncedAutoSave,
-  ]);
+  }, [open, debouncedAutoSave]);
 
   const selectedClient = useMemo(() => customers.find(c => c.id === clientId), [customers, clientId]);
 
