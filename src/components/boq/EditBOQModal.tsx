@@ -539,8 +539,16 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
     }
   };
 
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    if (!newOpen && unsavedChangesRef.current) {
+      setShowUnsavedDialog(true);
+    } else {
+      onOpenChange(newOpen);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="w-[95vw] max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">

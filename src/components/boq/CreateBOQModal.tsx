@@ -107,7 +107,8 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [pendingUnitTarget, setPendingUnitTarget] = useState<{ sectionId: string; itemId: string } | null>(null);
   const [previewItem, setPreviewItem] = useState<{ sectionId: string; subsectionId: string; itemId: string } | null>(null);
-  const [draftSaved, setDraftSaved] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -187,6 +188,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     if (!currentCompany?.id || !profile?.id) return;
 
     try {
+      setIsSavingDraft(true);
       const selectedCustomer = customers.find(c => c.id === formData.clientId);
       const result = await saveBoqDraft(profile.id, currentCompany.id, {
         boqNumber: formData.boqNumber,
@@ -209,15 +211,15 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       });
 
       if (result.success) {
-        setDraftSaved(true);
         setLastAutosavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        // Hide "Draft saved" indicator after 2 seconds
-        setTimeout(() => setDraftSaved(false), 2000);
+        setHasUnsavedChanges(false);
       }
     } catch (err) {
       console.log('Failed to save draft:', err);
+    } finally {
+      setIsSavingDraft(false);
     }
-  }, 2000);
+  }, 5000);
 
   // Autosave whenever form state changes
   useEffect(() => {
@@ -257,14 +259,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
   const addSection = () => {
     setSections(prev => [...prev, defaultSection()]);
+    setHasUnsavedChanges(true);
   };
 
   const removeSection = (sectionId: string) => {
     setSections(prev => prev.filter(s => s.id !== sectionId));
+    setHasUnsavedChanges(true);
   };
 
   const updateSectionTitle = (sectionId: string, title: string) => {
     setSections(prev => prev.map(s => s.id === sectionId ? { ...s, title } : s));
+    setHasUnsavedChanges(true);
   };
 
   const addItem = (sectionId: string, subsectionId: string) => {
@@ -272,6 +277,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, items: [...sub.items, defaultItem()] } : sub)
     } : s));
+    setHasUnsavedChanges(true);
   };
 
   const removeItem = (sectionId: string, subsectionId: string, itemId: string) => {
@@ -279,6 +285,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, items: sub.items.filter(i => i.id !== itemId) } : sub)
     } : s));
+    setHasUnsavedChanges(true);
   };
 
   const updateItem = (sectionId: string, subsectionId: string, itemId: string, field: keyof BOQItemRow, value: string | number) => {
@@ -302,6 +309,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         })
       };
     }));
+    setHasUnsavedChanges(true);
   };
 
   const updateSubsectionLabel = (sectionId: string, subsectionId: string, label: string) => {
@@ -309,6 +317,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, label } : sub)
     } : s));
+    setHasUnsavedChanges(true);
   };
 
   const addSubsection = (sectionId: string) => {
@@ -320,6 +329,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         subsections: [...s.subsections, defaultSubsection(nextLetter, `Subsection ${nextLetter}`)]
       };
     }));
+    setHasUnsavedChanges(true);
   };
 
   const removeSubsection = (sectionId: string, subsectionId: string) => {
@@ -330,6 +340,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         subsections: s.subsections.filter(sub => sub.id !== subsectionId)
       };
     }));
+    setHasUnsavedChanges(true);
   };
 
   const formatCurrency = (amount: number) => {
@@ -586,19 +597,19 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>BOQ Number</Label>
-              <Input value={boqNumber} onChange={e => setBoqNumber(e.target.value)} />
+              <Input value={boqNumber} onChange={e => { setBoqNumber(e.target.value); setHasUnsavedChanges(true); }} />
             </div>
             <div>
               <Label>Date</Label>
-              <Input type="date" value={boqDate} onChange={e => setBoqDate(e.target.value)} />
+              <Input type="date" value={boqDate} onChange={e => { setBoqDate(e.target.value); setHasUnsavedChanges(true); }} />
             </div>
             <div>
               <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+              <Input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setHasUnsavedChanges(true); }} />
             </div>
             <div>
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} onValueChange={(val) => { setCurrency(val); setHasUnsavedChanges(true); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -614,7 +625,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
           <div>
             <Label>Client</Label>
-            <Select value={clientId} onValueChange={setClientId}>
+            <Select value={clientId} onValueChange={(val) => { setClientId(val); setHasUnsavedChanges(true); }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
@@ -629,11 +640,11 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Project Title</Label>
-              <Input value={projectTitle} onChange={e => setProjectTitle(e.target.value)} />
+              <Input value={projectTitle} onChange={e => { setProjectTitle(e.target.value); setHasUnsavedChanges(true); }} />
             </div>
             <div>
               <Label>Contractor</Label>
-              <Input value={contractor} onChange={e => setContractor(e.target.value)} />
+              <Input value={contractor} onChange={e => { setContractor(e.target.value); setHasUnsavedChanges(true); }} />
             </div>
           </div>
 
@@ -790,21 +801,21 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
           <div>
             <Label>Notes</Label>
-            <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Any special notes or terms" />
+            <Textarea value={notes} onChange={e => { setNotes(e.target.value); setHasUnsavedChanges(true); }} rows={4} placeholder="Any special notes or terms" />
           </div>
 
           <div>
             <Label>Terms and Conditions</Label>
             <Textarea
               value={termsAndConditions}
-              onChange={e => setTermsAndConditions(e.target.value)}
+              onChange={e => { setTermsAndConditions(e.target.value); setHasUnsavedChanges(true); }}
               rows={6}
             />
             <div className="flex items-center space-x-2 mt-3">
               <Checkbox
                 id="showCalculatedValues"
                 checked={showCalculatedValuesInTerms}
-                onCheckedChange={(checked) => setShowCalculatedValuesInTerms(checked === true)}
+                onCheckedChange={(checked) => { setShowCalculatedValuesInTerms(checked === true); setHasUnsavedChanges(true); }}
               />
               <Label htmlFor="showCalculatedValues" className="font-normal cursor-pointer">
                 Show calculated values (e.g., 50% (KES 50,000))
@@ -819,9 +830,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
               Clear Form
             </Button>
             <BOQSaveIndicator
-              isSaving={draftSaved && lastAutosavedAt !== null}
+              isSaving={isSavingDraft}
               lastSavedTime={lastAutosavedAt}
-              hasUnsavedChanges={false}
+              hasUnsavedChanges={hasUnsavedChanges}
             />
           </div>
           <div className="space-x-2">
