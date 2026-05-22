@@ -557,7 +557,6 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     } else {
       toast.success('Form cleared');
     }
-    setDraftSaved(false);
   };
 
   return (
@@ -575,7 +574,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
               )}
             </div>
             <div className="flex items-center space-x-4">
-              {draftSaved && (
+              {isSavingDraft && (
                 <div className="flex items-center space-x-2 text-green-600">
                   <Check className="h-4 w-4" />
                   <span className="text-sm font-medium">Autosaving...</span>
