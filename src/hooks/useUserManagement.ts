@@ -168,24 +168,40 @@ const useUserManagement = () => {
         }
 
         // Create profile linked to the auth user
-        const { error: profileError } = await supabase
+        const profileData = {
+          id: authData.user.id,
+          email: userData.email,
+          full_name: userData.full_name,
+          role: userData.role,
+          phone: userData.phone,
+          department: userData.department,
+          position: userData.position,
+          company_id: currentUser.company_id,
+          status: 'active' as const,
+        };
+
+        console.log('Creating profile with data:', profileData);
+
+        const { error: profileError, data: profileResult } = await supabase
           .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: userData.email,
-            full_name: userData.full_name,
-            role: userData.role,
-            phone: userData.phone,
-            department: userData.department,
-            position: userData.position,
-            company_id: currentUser.company_id,
-            status: 'active',
-          });
+          .insert([profileData])
+          .select();
+
+        console.log('Profile insert result:', { profileResult, profileError });
 
         if (profileError) {
           // Clean up auth user if profile creation fails
-          await supabase.auth.admin?.deleteUser(authData.user.id).catch(() => {});
+          console.error('Profile creation failed, cleaning up auth user');
+          await supabase.auth.admin?.deleteUser(authData.user.id).catch((err) => {
+            console.error('Failed to clean up auth user:', err);
+          });
           throw profileError;
+        }
+
+        if (!profileResult || profileResult.length === 0) {
+          // Clean up auth user if profile wasn't created
+          await supabase.auth.admin?.deleteUser(authData.user.id).catch(() => {});
+          throw new Error('Failed to create user profile');
         }
       } else {
         // Fallback: Create profile without auth (legacy behavior)
