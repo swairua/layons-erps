@@ -48,13 +48,13 @@ export function CreateUserModal({
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
+    if (!formData.email || !formData.email.trim()) {
       errors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Please enter a valid email';
     }
 
-    if (!formData.full_name.trim()) {
+    if (!formData.full_name || !formData.full_name.trim()) {
       errors.full_name = 'Full name is required';
     }
 
@@ -62,7 +62,7 @@ export function CreateUserModal({
       errors.role = 'Role is required';
     }
 
-    if (!formData.password.trim()) {
+    if (!formData.password || !formData.password.trim()) {
       errors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
@@ -76,13 +76,20 @@ export function CreateUserModal({
     e.preventDefault();
 
     if (!validateForm()) {
+      console.warn('Form validation failed');
       return;
     }
 
-    const result = await onCreateUser(formData);
-    
-    if (result.success) {
-      handleClose();
+    try {
+      const result = await onCreateUser(formData);
+
+      if (result.success) {
+        handleClose();
+      } else {
+        console.error('Failed to create user:', result.error);
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
     }
   };
 
