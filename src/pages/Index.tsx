@@ -52,7 +52,7 @@ const Index = () => {
       </div>
 
       {/* Dashboard Stats */}
-      <DashboardStats />
+      {!isSalesAccount && <DashboardStats />}
 
       {/* Dashboard Summary Cards with Drill-down */}
       {!isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
