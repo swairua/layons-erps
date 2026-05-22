@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { BiolegendLogo } from '@/components/ui/biolegend-logo';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarItem {
   title: string;
@@ -89,7 +90,17 @@ const sidebarItems: SidebarItem[] = [
 export function Sidebar() {
   const location = useLocation();
   const { currentCompany } = useCurrentCompany();
+  const { profile } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+
+  const filteredSidebarItems = sidebarItems.filter(item => {
+    if (isSalesAccount) {
+      return !['Payments', 'Audit Logs', 'Settings'].includes(item.title);
+    }
+    return true;
+  });
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev => 
@@ -187,7 +198,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2 p-4 custom-scrollbar overflow-y-auto">
-        {sidebarItems.map(renderSidebarItem)}
+        {filteredSidebarItems.map(renderSidebarItem)}
       </nav>
 
       {/* Company Info */}
