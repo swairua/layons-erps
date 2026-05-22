@@ -132,6 +132,17 @@ const useUserManagement = () => {
 
     try {
       if (userData.password) {
+        // Check if user already exists by email
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', userData.email)
+          .maybeSingle();
+
+        if (existingProfile) {
+          throw new Error('User with this email already exists');
+        }
+
         // Create auth user first
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: userData.email,
@@ -144,8 +155,9 @@ const useUserManagement = () => {
         });
 
         if (authError) {
-          // Handle duplicate email error
-          if (authError.message?.includes('duplicate') || authError.message?.includes('already exists')) {
+          // Handle duplicate email error from auth
+          const errorMsg = authError.message?.toLowerCase() || '';
+          if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('user already registered')) {
             throw new Error('User with this email already exists');
           }
           throw authError;
