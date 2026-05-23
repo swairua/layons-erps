@@ -16,8 +16,11 @@ const Index = () => {
   const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   useEffect(() => {
-    console.log('📊 Dashboard - Profile:', profile?.email, 'isSalesAccount:', isSalesAccount);
-  }, [profile, isSalesAccount]);
+    if (profile?.email) {
+      console.log('📊 Dashboard - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+      console.log('📊 Dashboard - DashboardStats visible:', !isSalesAccount, 'DashboardSummaryCards visible:', !isSalesAccount);
+    }
+  }, [profile?.email, isSalesAccount]);
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state

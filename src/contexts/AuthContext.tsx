@@ -124,6 +124,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return null;
         }
 
+        if (profileData.email) {
+          profileData.email = profileData.email.toLowerCase();
+        }
         return profileData;
       } catch (fetchError) {
         lastError = fetchError;
@@ -422,7 +425,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                           console.warn('⚠️ Profile still unavailable after retry, creating minimal profile');
                           setProfile({
                             id: quickSession.user.id,
-                            email: quickSession.user.email || '',
+                            email: (quickSession.user.email || '').toLowerCase(),
                             role: 'user', // Default to user role, may be updated when profile loads
                             status: 'active',
                             created_at: new Date().toISOString(),
@@ -441,7 +444,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                       if (mountedRef.current) {
                         setProfile({
                           id: quickSession.user.id,
-                          email: quickSession.user.email || '',
+                          email: (quickSession.user.email || '').toLowerCase(),
                           role: 'user', // Default to user role, may be updated when profile loads
                           status: 'active',
                           created_at: new Date().toISOString(),
@@ -482,7 +485,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         // Create minimal profile as fallback
                         setProfile({
                           id: quickSession.user.id,
-                          email: quickSession.user.email || '',
+                          email: (quickSession.user.email || '').toLowerCase(),
                           role: 'user',
                           status: 'active',
                           created_at: new Date().toISOString(),
@@ -495,7 +498,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (mountedRef.current) {
                       setProfile({
                         id: quickSession.user.id,
-                        email: quickSession.user.email || '',
+                        email: (quickSession.user.email || '').toLowerCase(),
                         role: 'user',
                         status: 'active',
                         created_at: new Date().toISOString(),
@@ -545,7 +548,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   if (mountedRef.current) {
                     setProfile(userProfile || {
                       id: bgSession.user.id,
-                      email: bgSession.user.email || '',
+                      email: (bgSession.user.email || '').toLowerCase(),
                       role: 'user',
                       status: 'active',
                       created_at: new Date().toISOString(),
@@ -671,6 +674,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .then(userProfile => {
             if (mountedRef.current) {
               if (userProfile) {
+                if (userProfile.email) {
+                  userProfile.email = userProfile.email.toLowerCase();
+                }
                 setProfile(userProfile);
                 console.log('✅ Profile loaded successfully after sign in');
               } else {
@@ -692,7 +698,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (mountedRef.current) {
                       setProfile(retryProfile || {
                         id: signedInUser.id,
-                        email: signedInUser.email || '',
+                        email: (signedInUser.email || '').toLowerCase(),
                         role: 'user',
                         status: 'active',
                         created_at: new Date().toISOString(),
@@ -704,7 +710,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (mountedRef.current) {
                       setProfile({
                         id: signedInUser.id,
-                        email: signedInUser.email || '',
+                        email: (signedInUser.email || '').toLowerCase(),
                         role: 'user',
                         status: 'active',
                         created_at: new Date().toISOString(),
@@ -735,7 +741,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   if (mountedRef.current) {
                     setProfile(retryProfile || {
                       id: signedInUser.id,
-                      email: signedInUser.email || '',
+                      email: (signedInUser.email || '').toLowerCase(),
                       role: 'user',
                       status: 'active',
                       created_at: new Date().toISOString(),
@@ -747,7 +753,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   if (mountedRef.current) {
                     setProfile({
                       id: signedInUser.id,
-                      email: signedInUser.email || '',
+                      email: (signedInUser.email || '').toLowerCase(),
                       role: 'user',
                       status: 'active',
                       created_at: new Date().toISOString(),

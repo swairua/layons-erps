@@ -105,10 +105,11 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   useEffect(() => {
-    if (profile) {
-      console.log('🔍 Sidebar - Profile email:', profile.email, 'isSalesAccount:', isSalesAccount);
+    if (profile?.email) {
+      console.log('🔍 Sidebar - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+      console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
     }
-  }, [profile?.email, isSalesAccount]);
+  }, [profile?.email, isSalesAccount, filteredSidebarItems]);
 
   // Filter sidebar items based on user role
   const filteredSidebarItems = useMemo(() => {
