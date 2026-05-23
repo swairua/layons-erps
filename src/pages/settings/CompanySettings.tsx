@@ -26,7 +26,7 @@ import { addCurrencyColumn, ADD_CURRENCY_COLUMN_SQL } from '@/utils/addCurrencyC
 export default function CompanySettings() {
   const { profile } = useAuth();
 
-  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   if (isSalesAccount) {
     return (

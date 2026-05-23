@@ -12,7 +12,7 @@ const Index = () => {
   const { profile } = useAuth();
   const { data: companies } = useCompanies();
 
-  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state

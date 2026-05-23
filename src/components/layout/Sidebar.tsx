@@ -101,7 +101,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   const { profile } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   const filteredSidebarItems = sidebarItems.filter(item => {
     if (isSalesAccount) {

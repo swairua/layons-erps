@@ -103,7 +103,7 @@ export default function Payments() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any>(null);
 
-  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   if (isSalesAccount) {
     return (
