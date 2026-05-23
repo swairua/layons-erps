@@ -277,7 +277,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
   }, []);
 
   useEffect(() => {
-    if (open && boq && boq.data && profile?.id && currentCompany?.id) {
+    if (open && boq && profile?.id && currentCompany?.id) {
       // Check if there's an edit draft for this BOQ
       const checkAndLoadDraft = async () => {
         const editDraft = await loadEditDraft(profile.id, currentCompany.id, boq.id);
@@ -287,26 +287,36 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           ? editDraft
           : boq;
 
-        const boqData = dataToUse.data;
+        // Safely extract boq data with fallbacks
+        const boqData = dataToUse.data || {};
+
+        // Set basic fields from dataToUse (top-level fields)
         setBoqNumber(dataToUse.number || '');
         setBoqDate(dataToUse.boq_date || '');
         setDueDate(dataToUse.due_date || '');
-        setProjectTitle(boqData.project_title || '');
-        setContractor(boqData.contractor || '');
+
+        // Set fields that may be in data object or top-level
+        setProjectTitle(dataToUse.project_title || boqData.project_title || '');
+        setContractor(dataToUse.contractor || boqData.contractor || '');
         setNotes(boqData.notes || '');
 
         const termsToUse = dataToUse.terms_and_conditions || '';
         setTermsAndConditions(termsToUse);
         const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
         setShowCalculatedValuesInTerms(showCalcValues);
-        setCurrency(boqData.currency || 'KES');
 
+        // Currency can be in data or top-level
+        const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
+        setCurrency(currencyToUse);
+
+        // Set client ID from client_name
         const clientIdFromBoq = customers.find(c => c.name === dataToUse.client_name)?.id;
         if (clientIdFromBoq) {
           setClientId(clientIdFromBoq);
         }
 
-        if (boqData.sections && boqData.sections.length > 0) {
+        // Load sections with proper fallback
+        if (boqData.sections && Array.isArray(boqData.sections) && boqData.sections.length > 0) {
           const loadedSections: BOQSectionRow[] = boqData.sections.map((section: any) => ({
             id: `section-${generateSafeUUID()}`,
             title: section.title || 'General',
@@ -316,7 +326,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
               label: subsection.label,
               items: (subsection.items || []).map((item: any) => ({
                 id: `item-${generateSafeUUID()}`,
-                description: item.description,
+                description: item.description || '',
                 quantity: item.quantity || 1,
                 unit: item.unit_id || '',
                 rate: item.rate || 0,
@@ -325,6 +335,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           }));
           setSections(loadedSections);
         } else {
+          // No sections found, use default
           setSections([defaultSection()]);
         }
 
