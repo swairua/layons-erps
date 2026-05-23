@@ -104,13 +104,6 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   // Check if this is the sales account by comparing email
   const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
-  useEffect(() => {
-    if (profile?.email) {
-      console.log('🔍 Sidebar - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
-      console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
-    }
-  }, [profile?.email, isSalesAccount, filteredSidebarItems]);
-
   // Filter sidebar items based on user role
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems.filter(item => {
@@ -121,6 +114,13 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
       return true;
     });
   }, [isSalesAccount]);
+
+  useEffect(() => {
+    if (profile?.email) {
+      console.log('🔍 Sidebar - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+      console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
+    }
+  }, [profile?.email, isSalesAccount, filteredSidebarItems]);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev => 
