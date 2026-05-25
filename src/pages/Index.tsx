@@ -1,26 +1,24 @@
-import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { DashboardSummaryCards } from '@/components/dashboard/DashboardSummaryCards';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { useCompanies } from '@/hooks/useDatabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useIsSalesAccount } from '@/contexts/AuthContext';
 import SEO from '@/components/SEO';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { isSalesAccount, isLoading } = useIsSalesAccount();
   const { data: companies } = useCompanies();
 
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
-
   useEffect(() => {
-    if (profile?.email) {
-      console.log('📊 Dashboard - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+    if (!isLoading) {
+      console.log('📊 Dashboard - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
       console.log('📊 Dashboard - DashboardStats visible:', !isSalesAccount, 'DashboardSummaryCards visible:', !isSalesAccount);
     }
-  }, [profile?.email, isSalesAccount]);
+  }, [isLoading, isSalesAccount]);
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state
@@ -59,11 +57,11 @@ const Index = () => {
         </p>
       </div>
 
-      {/* Dashboard Stats */}
-      {!isSalesAccount && <DashboardStats />}
+      {/* Dashboard Stats - only show when profile is loaded and not a sales account */}
+      {!isLoading && !isSalesAccount && <DashboardStats />}
 
-      {/* Dashboard Summary Cards with Drill-down */}
-      {!isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
+      {/* Dashboard Summary Cards with Drill-down - only show when profile is loaded and not a sales account */}
+      {!isLoading && !isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">

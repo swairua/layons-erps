@@ -80,6 +80,14 @@ export const useAuth = () => {
   return context;
 };
 
+export const useIsSalesAccount = () => {
+  const { profile, loading } = useAuth();
+  const isSalesAccount =
+    profile?.email?.toLowerCase().trim() === 'sales@layonsconstruction.com' &&
+    profile?.role === 'user';
+  return { isSalesAccount, isLoading: loading };
+};
+
 interface AuthProviderProps {
   children: React.ReactNode;
 }
