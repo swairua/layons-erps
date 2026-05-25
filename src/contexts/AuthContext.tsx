@@ -656,7 +656,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { error: formattedError as AuthError };
     }
 
-    // Immediately update auth state
+    // Update auth state and wait for profile load before clearing loading
     try {
       const session = (data as any)?.data?.session;
       const signedInUser = session?.user;
@@ -664,117 +664,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setSession(session);
         setUser(signedInUser);
 
-        // Set loading to false immediately, profile fetch happens in background
-        setLoading(false);
-
-        // Fetch profile in background with extended timeout to prevent missing admin roles
+        // Fetch profile with timeout before clearing loading state
+        // This ensures components render with correct role/email filtering
         const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
           setTimeout(() => {
-            console.warn('⏱️ Profile fetch timeout');
+            console.warn('⏱️ Profile fetch timeout during sign in (5s)');
             resolve(null);
-          }, 10000); // 10 second timeout - increased to allow profile fetch to complete
+          }, 5000); // 5 second timeout for sign in flow
         });
 
-        Promise.race([
+        const userProfile = await Promise.race([
           fetchProfile(signedInUser.id),
           profileTimeoutPromise
-        ])
-          .then(userProfile => {
-            if (mountedRef.current) {
-              if (userProfile) {
-                if (userProfile.email) {
-                  userProfile.email = userProfile.email.toLowerCase();
-                }
-                setProfile(userProfile);
-                console.log('✅ Profile loaded successfully after sign in');
-              } else {
-                // If fetch returned null, try again with a longer timeout
-                console.warn('⚠️ Profile fetch returned null, retrying with longer timeout');
+        ]);
 
-                const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-                  setTimeout(() => {
-                    console.warn('⏱️ Profile retry timeout');
-                    resolve(null);
-                  }, 15000); // 15 second timeout for retry
-                });
-
-                Promise.race([
-                  fetchProfile(signedInUser.id),
-                  retryTimeoutPromise
-                ])
-                  .then(retryProfile => {
-                    if (mountedRef.current) {
-                      setProfile(retryProfile || {
-                        id: signedInUser.id,
-                        email: (signedInUser.email || '').toLowerCase(),
-                        role: 'user',
-                        status: 'active',
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      } as UserProfile);
-                    }
-                  })
-                  .catch(() => {
-                    if (mountedRef.current) {
-                      setProfile({
-                        id: signedInUser.id,
-                        email: (signedInUser.email || '').toLowerCase(),
-                        role: 'user',
-                        status: 'active',
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      } as UserProfile);
-                    }
-                  });
-              }
+        if (mountedRef.current) {
+          if (userProfile) {
+            if (userProfile.email) {
+              userProfile.email = userProfile.email.toLowerCase();
             }
-          })
-          .catch((profileError) => {
-            // Try again with a longer timeout on error
-            if (mountedRef.current) {
-              console.warn('⚠️ Profile fetch failed, retrying with longer timeout');
+            setProfile(userProfile);
+            console.log('✅ Profile loaded successfully during sign in');
+          } else {
+            // Create minimal profile as fallback to allow app to function
+            const fallbackProfile: UserProfile = {
+              id: signedInUser.id,
+              email: (signedInUser.email || '').toLowerCase(),
+              role: 'user',
+              status: 'active',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setProfile(fallbackProfile);
+            console.warn('⚠️ Profile fetch timeout, using fallback profile');
+          }
 
-              const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-                setTimeout(() => {
-                  console.warn('⏱️ Profile retry timeout');
-                  resolve(null);
-                }, 15000); // 15 second timeout for retry
-              });
+          // Now safe to clear loading state - profile is set
+          setLoading(false);
 
-              Promise.race([
-                fetchProfile(signedInUser.id),
-                retryTimeoutPromise
-              ])
-                .then(retryProfile => {
-                  if (mountedRef.current) {
-                    setProfile(retryProfile || {
-                      id: signedInUser.id,
-                      email: (signedInUser.email || '').toLowerCase(),
-                      role: 'user',
-                      status: 'active',
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString()
-                    } as UserProfile);
-                  }
-                })
-                .catch(() => {
-                  if (mountedRef.current) {
-                    setProfile({
-                      id: signedInUser.id,
-                      email: (signedInUser.email || '').toLowerCase(),
-                      role: 'user',
-                      status: 'active',
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString()
-                    } as UserProfile);
-                  }
-                });
-            }
-            logError('Profile fetch failed after sign in:', profileError, {
-              userId: signedInUser.id,
-              context: 'signIn'
+          // Continue with background retry for profile if needed
+          if (!userProfile) {
+            console.log('🔄 Starting background profile retry...');
+            const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
+              setTimeout(() => {
+                console.warn('⏱️ Profile retry timeout');
+                resolve(null);
+              }, 10000); // 10 second timeout for background retry
             });
-          });
+
+            Promise.race([
+              fetchProfile(signedInUser.id),
+              retryTimeoutPromise
+            ])
+              .then(retryProfile => {
+                if (mountedRef.current && retryProfile) {
+                  setProfile(retryProfile);
+                  console.log('✅ Profile loaded on background retry');
+                }
+              })
+              .catch(retryError => {
+                logError('Profile retry failed:', retryError, {
+                  userId: signedInUser.id,
+                  context: 'signIn'
+                });
+              });
+          }
+        }
       } else {
         setLoading(false);
       }
@@ -783,7 +738,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     setTimeout(() => toast.success('Signed in successfully'), 0);
     return { error: null };
-  }, []);
+  }, [fetchProfile]);
 
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     const { data, error } = await safeAuthOperation(async () => {
