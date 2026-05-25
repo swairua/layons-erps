@@ -103,25 +103,19 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
 
   // Filter sidebar items based on user role
   const filteredSidebarItems = useMemo(() => {
-    // If profile is still loading, show all items to avoid flashing
-    if (isLoading) {
-      return sidebarItems;
-    }
     return sidebarItems.filter(item => {
-      // Hide these items for sales accounts
+      // Hide these items for sales accounts (apply filter immediately, don't wait for loading)
       if (isSalesAccount && ['Payments', 'Audit Logs', 'Settings'].includes(item.title)) {
         return false;
       }
       return true;
     });
-  }, [isSalesAccount, isLoading]);
+  }, [isSalesAccount]);
 
   useEffect(() => {
-    if (!isLoading) {
-      console.log('🔍 Sidebar - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
-      console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
-    }
-  }, [isLoading, isSalesAccount, filteredSidebarItems]);
+    console.log('🔍 Sidebar - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
+    console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
+  }, [isSalesAccount, filteredSidebarItems, isLoading]);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev => 

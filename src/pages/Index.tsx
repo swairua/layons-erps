@@ -14,11 +14,9 @@ const Index = () => {
   const { data: companies } = useCompanies();
 
   useEffect(() => {
-    if (!isLoading) {
-      console.log('📊 Dashboard - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
-      console.log('📊 Dashboard - DashboardStats visible:', !isSalesAccount, 'DashboardSummaryCards visible:', !isSalesAccount);
-    }
-  }, [isLoading, isSalesAccount]);
+    console.log('📊 Dashboard - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
+    console.log('📊 Dashboard - DashboardStats visible:', !isSalesAccount, 'DashboardSummaryCards visible:', !isSalesAccount);
+  }, [isSalesAccount, isLoading]);
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state
@@ -57,11 +55,11 @@ const Index = () => {
         </p>
       </div>
 
-      {/* Dashboard Stats - only show when profile is loaded and not a sales account */}
-      {!isLoading && !isSalesAccount && <DashboardStats />}
+      {/* Dashboard Stats - hide for sales accounts */}
+      {!isSalesAccount && <DashboardStats />}
 
-      {/* Dashboard Summary Cards with Drill-down - only show when profile is loaded and not a sales account */}
-      {!isLoading && !isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
+      {/* Dashboard Summary Cards with Drill-down - hide for sales accounts */}
+      {!isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
