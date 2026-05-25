@@ -98,8 +98,16 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Function error:", error);
+    let errorMessage = "Internal server error";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (error && typeof error === "object" && "message" in error) {
+      errorMessage = String((error as any).message);
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    }
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: corsHeaders }
     );
   }

@@ -760,7 +760,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) {
         logError('Error changing user password:', error, { context: 'changeUserPassword', targetUserId: userId });
-        const errorMessage = typeof error === 'string' ? error : (error as any)?.message || 'Failed to change password';
+        let errorMessage = 'Failed to change password';
+        if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (error && typeof error === 'object') {
+          errorMessage = (error as any)?.message || (error as any)?.error || parseErrorMessage(error) || 'Failed to change password';
+        }
         setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
         return { error: new Error(errorMessage) };
       }
