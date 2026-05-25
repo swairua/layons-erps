@@ -291,333 +291,94 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [fetchProfile, updateLastLogin]);
 
-  // Initialize auth state with ultra-fast approach and background retry
+  // Initialize auth state - simple and robust
   useEffect(() => {
     if (initializingRef.current) return;
-
     initializingRef.current = true;
     mountedRef.current = true;
 
-    const initializeAuthState = async () => {
-      console.log('🚀 Starting fast auth initialization...');
+    let completed = false;
 
-      // Skip health check - it can hang if Supabase is unreachable
-      console.log('⏭️  Skipping health check to avoid startup delays');
-      // try {
-      //   const { checkSupabaseHealth } = await import('@/utils/supabaseHealthCheck');
-      //   const health = await checkSupabaseHealth();
-      //   if (!health.isHealthy) {
-      //     console.warn('⚠️ Supabase health check detected issues:', health.issues);
-      //   } else {
-      //     console.log('✅ Supabase connectivity OK');
-      //   }
-      // } catch (healthCheckError) {
-      //   console.warn('⚠️ Could not perform Supabase health check:', healthCheckError);
-      // }
-
-      // Start app after initial session check completes (max 2 seconds)
-      let appStarted = false;
-      const startAppAfterCheck = () => {
-        if (mountedRef.current && !appStarted) {
-          appStarted = true;
-          setLoading(false);
-          setInitialized(true);
-          console.log('🏁 App started after initial session check');
-        }
-      };
-
-      // Give session check 1 second before forcing app start
-      const sessionCheckTimer = setTimeout(startAppAfterCheck, 1000);
-
-      try {
-        // Very fast auth check with 3-second timeout
-        console.log('🔍 Quick auth check (3s timeout)...');
-
-        const quickAuthPromise = new Promise<any>(async (resolve, reject) => {
-          try {
-            // Quick session check with aggressive timeout
-            const sessionTimeoutPromise = new Promise((_, rejectTimeout) => {
-              setTimeout(() => rejectTimeout(new Error('Session check timeout')), 1500);
-            });
-
-            const sessionCheckPromise = supabase.auth.getSession();
-            const { data: sessionData, error } = await Promise.race([sessionCheckPromise, sessionTimeoutPromise]) as any;
-
-            if (error) {
-              console.warn('⚠️ Quick session check error:', error.message);
-              resolve({ session: null, error });
-              return;
-            }
-
-            console.log('✅ Quick session check completed');
-            resolve({ session: sessionData?.session, error: null });
-          } catch (fetchError) {
-            const fetchErrorMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
-            console.warn('⚠️ Quick session fetch error:', fetchErrorMsg);
-            resolve({ session: null, error: fetchError });
-          }
-        });
-
-        // 2-second timeout for quick check
-        const quickTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Quick auth timeout after 2000ms')), 2000);
-        });
-
-        // Race quick auth against timeout
-        const result = await Promise.race([quickAuthPromise, quickTimeoutPromise]);
-        const { session: quickSession, error } = result as any;
-
-        if (quickSession?.user && mountedRef.current) {
-          console.log('✅ Quick auth success - user authenticated');
-
-          // Clear the session check timer and start app immediately
-          clearTimeout(sessionCheckTimer);
-          appStarted = true;
-
-          // Set auth state immediately
-          setSession(quickSession);
-          setUser(quickSession.user);
-          setLoading(false);
-          setInitialized(true);
-          initializingRef.current = false;
-          console.log('🎉 Fast auth initialization completed - app started');
-
-          // Fetch profile in background with extended timeout to prevent missing admin roles
-          const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-            setTimeout(() => {
-              console.warn('⏱️ Profile fetch timeout during quick auth');
-              resolve(null);
-            }, 10000); // 10 second timeout - increased to allow profile fetch to complete
-          });
-
-          Promise.race([
-            fetchProfile(quickSession.user.id),
-            profileTimeoutPromise
-          ])
-            .then(userProfile => {
-              if (mountedRef.current) {
-                // Set the actual profile - this is crucial for admin/role checks
-                if (userProfile) {
-                  setProfile(userProfile);
-                  console.log('✅ Profile loaded successfully');
-
-                  // Update last login silently
-                  updateLastLogin(quickSession.user.id).catch(err =>
-                    logError('Update last login failed:', err, {
-                      userId: quickSession.user.id,
-                      context: 'quickAuth'
-                    })
-                  );
-                } else {
-                  // If fetch returned null, try again with a longer timeout
-                  console.warn('⚠️ Profile fetch returned null, retrying with longer timeout');
-
-                  const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-                    setTimeout(() => {
-                      console.warn('⏱️ Profile retry timeout');
-                      resolve(null);
-                    }, 15000); // 15 second timeout for retry
-                  });
-
-                  Promise.race([
-                    fetchProfile(quickSession.user.id),
-                    retryTimeoutPromise
-                  ])
-                    .then(retryProfile => {
-                      if (mountedRef.current) {
-                        if (retryProfile) {
-                          setProfile(retryProfile);
-                          console.log('✅ Profile loaded on retry');
-                        } else {
-                          // If still no profile, create minimal profile to allow app to work
-                          console.warn('⚠️ Profile still unavailable after retry, creating minimal profile');
-                          setProfile({
-                            id: quickSession.user.id,
-                            email: (quickSession.user.email || '').toLowerCase(),
-                            role: 'user', // Default to user role, may be updated when profile loads
-                            status: 'active',
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                          } as UserProfile);
-                        }
-                      }
-                    })
-                    .catch(retryError => {
-                      logError('⚠️ Profile retry fetch failed:', retryError, {
-                        userId: quickSession.user.id,
-                        context: 'profileRetry'
-                      });
-
-                      // Create minimal profile to allow app to work
-                      if (mountedRef.current) {
-                        setProfile({
-                          id: quickSession.user.id,
-                          email: (quickSession.user.email || '').toLowerCase(),
-                          role: 'user', // Default to user role, may be updated when profile loads
-                          status: 'active',
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString()
-                        } as UserProfile);
-                      }
-                    });
-                }
-              }
-            })
-            .catch(profileError => {
-              logError('⚠️ Profile fetch failed:', profileError, {
-                userId: quickSession.user.id,
-                context: 'profileFetch'
-              });
-
-              // Try again with a longer timeout on error
-              if (mountedRef.current) {
-                console.warn('⚠️ Profile fetch failed, retrying with longer timeout');
-
-                const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-                  setTimeout(() => {
-                    console.warn('⏱️ Profile retry timeout');
-                    resolve(null);
-                  }, 15000); // 15 second timeout for retry
-                });
-
-                Promise.race([
-                  fetchProfile(quickSession.user.id),
-                  retryTimeoutPromise
-                ])
-                  .then(retryProfile => {
-                    if (mountedRef.current) {
-                      if (retryProfile) {
-                        setProfile(retryProfile);
-                        console.log('✅ Profile loaded on retry');
-                      } else {
-                        // Create minimal profile as fallback
-                        setProfile({
-                          id: quickSession.user.id,
-                          email: (quickSession.user.email || '').toLowerCase(),
-                          role: 'user',
-                          status: 'active',
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString()
-                        } as UserProfile);
-                      }
-                    }
-                  })
-                  .catch(() => {
-                    if (mountedRef.current) {
-                      setProfile({
-                        id: quickSession.user.id,
-                        email: (quickSession.user.email || '').toLowerCase(),
-                        role: 'user',
-                        status: 'active',
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      } as UserProfile);
-                    }
-                  });
-              }
-            });
-
-          return;
-        }
-
-        // If quick auth didn't work, continue with background retry
-        console.log('ℹ️ Quick auth did not find session, starting background retry...');
-
-        // Don't block app startup - let immediate timer complete
-        // But start background retry for better user experience
-        setTimeout(() => {
-          if (mountedRef.current && !user) {
-            console.log('🔄 Starting background auth retry...');
-
-            // More patient background retry (10 seconds)
-            const backgroundAuthCheck = async () => {
-              try {
-                const bgResult = await initializeAuth();
-                const { session: bgSession } = bgResult;
-
-                if (bgSession?.user && mountedRef.current && !user) {
-                  console.log('✅ Background auth retry succeeded');
-                  setSession(bgSession);
-                  setUser(bgSession.user);
-
-                  // Fetch profile with extended timeout (non-critical if it fails)
-                  const bgProfileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-                    setTimeout(() => {
-                      console.warn('⏱️ Background profile fetch timeout');
-                      resolve(null);
-                    }, 10000); // 10 second timeout
-                  });
-
-                  const userProfile = await Promise.race([
-                    fetchProfile(bgSession.user.id),
-                    bgProfileTimeoutPromise
-                  ]);
-
-                  if (mountedRef.current) {
-                    setProfile(userProfile || {
-                      id: bgSession.user.id,
-                      email: (bgSession.user.email || '').toLowerCase(),
-                      role: 'user',
-                      status: 'active',
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString()
-                    } as UserProfile);
-                    if (userProfile) {
-                      updateLastLogin(bgSession.user.id).catch(err =>
-                        logError('Background retry update last login failed:', err, {
-                          userId: bgSession.user.id,
-                          context: 'backgroundAuthRetry'
-                        })
-                      );
-                    }
-                  }
-                }
-              } catch (bgError) {
-                const bgErrorMsg = bgError instanceof Error ? bgError.message : String(bgError);
-                console.warn('⚠️ Background auth retry failed:', bgErrorMsg);
-                // Silent failure - app is already running
-              }
-            };
-
-            backgroundAuthCheck();
-          }
-        }, 2000); // Start background retry after 2 seconds
-
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.warn('⚠️ Quick auth check failed:', errorMsg);
-
-        // Handle specific error types silently
-        if (error instanceof Error) {
-          if (error.message.includes('Invalid Refresh Token') ||
-              error.message.includes('invalid_token')) {
-            console.warn('🧹 Clearing invalid tokens (silent)');
-            clearAuthTokens();
-          }
-        }
-
-        // Don't show errors - app will start anyway
+    const completeInit = () => {
+      if (!completed && mountedRef.current) {
+        completed = true;
+        setLoading(false);
+        setInitialized(true);
       }
+    };
 
-      // Ensure we always complete initialization even if immediate timer didn't fire
-      setTimeout(() => {
-        if (mountedRef.current && !initialized) {
-          console.log('🏁 Ensuring auth initialization completes');
-          setLoading(false);
-          setInitialized(true);
-          initializingRef.current = false;
-        }
-      }, 1500);
+    // CRITICAL: Ensure initialization completes within 3 seconds no matter what
+    const hardTimeout = setTimeout(() => {
+      console.warn('⚠️ Hard timeout: completing initialization');
+      completeInit();
+    }, 3000);
 
-      // Aggressive fallback - never stay in loading state more than 2 seconds
-      setTimeout(() => {
-        if (mountedRef.current && loading) {
-          console.log('⚡ Aggressive fallback: forcing loading to false after 2s');
-          setLoading(false);
-          setInitialized(true);
-          initializingRef.current = false;
+    const initializeAuthState = async () => {
+      try {
+        console.log('🚀 Starting auth initialization...');
+
+        // Simple session check with timeout
+        const sessionTimeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 1500);
+        });
+
+        try {
+          const { data: sessionData } = await Promise.race([
+            supabase.auth.getSession(),
+            sessionTimeoutPromise
+          ]) as any;
+
+          if (sessionData?.session?.user && mountedRef.current) {
+            console.log('✅ Session found, setting auth state');
+            setSession(sessionData.session);
+            setUser(sessionData.session.user);
+
+            // Fetch profile in background with timeout
+            const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
+              setTimeout(() => {
+                console.warn('⏱️ Profile fetch timeout (5s)');
+                resolve(null);
+              }, 5000);
+            });
+
+            Promise.race([
+              fetchProfile(sessionData.session.user.id),
+              profileTimeoutPromise
+            ])
+              .then(profile => {
+                if (mountedRef.current) {
+                  setProfile(profile || {
+                    id: sessionData.session.user.id,
+                    email: (sessionData.session.user.email || '').toLowerCase(),
+                    role: 'user',
+                    status: 'active',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  } as UserProfile);
+                }
+              })
+              .catch(() => {
+                if (mountedRef.current) {
+                  setProfile({
+                    id: sessionData.session.user.id,
+                    email: (sessionData.session.user.email || '').toLowerCase(),
+                    role: 'user',
+                    status: 'active',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  } as UserProfile);
+                }
+              });
+          }
+        } catch (sessionError) {
+          console.log('ℹ️ No active session');
         }
-      }, 2000);
+
+        completeInit();
+      } catch (error) {
+        console.error('❌ Initialization error:', error);
+        completeInit();
+      }
     };
 
     initializeAuthState();
@@ -626,10 +387,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     return () => {
+      clearTimeout(hardTimeout);
       mountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, updateLastLogin, handleAuthStateChange, user, initialized]);
+  }, [fetchProfile, handleAuthStateChange]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await safeAuthOperation(async () => {
