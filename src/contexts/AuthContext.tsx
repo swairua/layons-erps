@@ -82,7 +82,9 @@ export const useAuth = () => {
 
 export const useIsSalesAccount = () => {
   const { profile, loading } = useAuth();
-  const isSalesAccount = profile?.email?.toLowerCase().trim() === 'sales@layonsconstruction.com';
+  const isSalesAccount =
+    profile?.email?.toLowerCase().trim() === 'sales@layonsconstruction.com' &&
+    profile?.role === 'user';
   return { isSalesAccount, isLoading: loading };
 };
 
