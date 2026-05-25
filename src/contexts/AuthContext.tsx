@@ -760,13 +760,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) {
         logError('Error changing user password:', error, { context: 'changeUserPassword', targetUserId: userId });
-        let errorMessage = 'Failed to change password';
-        if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (error && typeof error === 'object') {
-          errorMessage = (error as any)?.message || (error as any)?.error || parseErrorMessage(error) || 'Failed to change password';
+        let errorMessage = formatErrorForDisplay(error);
+        if (!errorMessage || errorMessage === 'An unexpected error occurred') {
+          errorMessage = 'Failed to change password';
         }
         setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
         return { error: new Error(errorMessage) };
