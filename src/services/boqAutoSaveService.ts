@@ -95,7 +95,7 @@ export async function saveBoqDraft(
         notes: formData.notes,
       },
       terms_and_conditions: formData.termsAndConditions || null,
-      show_calculated_values_in_terms: formData.showCalculatedValuesInTerms || false,
+      showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
@@ -372,7 +372,7 @@ export async function saveEditingDraft(
       total_amount: boqData.total_amount || 0,
       data: boqData.data,
       terms_and_conditions: boqData.terms_and_conditions || null,
-      show_calculated_values_in_terms: boqData.show_calculated_values_in_terms || false,
+      showCalculatedValuesInTerms: boqData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
