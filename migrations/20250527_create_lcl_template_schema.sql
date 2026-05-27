@@ -97,16 +97,13 @@ ALTER TABLE lcl_template_history ENABLE ROW LEVEL SECURITY;
 -- Create policies to restrict access to company data
 DROP POLICY IF EXISTS lcl_template_structures_company_policy ON lcl_template_structures;
 CREATE POLICY lcl_template_structures_company_policy ON lcl_template_structures
-  FOR ALL
   USING (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE))
   WITH CHECK (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE));
 
 DROP POLICY IF EXISTS lcl_template_items_company_policy ON lcl_template_items
-  FOR ALL
   USING (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE))
   WITH CHECK (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE));
 
 DROP POLICY IF EXISTS lcl_template_history_company_policy ON lcl_template_history
-  FOR ALL
   USING (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE))
   WITH CHECK (company_id IN (SELECT id FROM companies WHERE id = auth.uid() OR TRUE));
