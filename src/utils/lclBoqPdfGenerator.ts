@@ -65,7 +65,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
         const amount = safeN(item.amount);
 
         flatItems.push({
-          description: `${item.item_number}. ${item.description}`,
+          description: item.description,
           quantity: qty,
           unit_price: rate,
           line_total: amount,
