@@ -176,7 +176,7 @@ export default function LCLTemplate() {
       const saved = await lclBoqService.saveLCLBOQ(boqData);
       setLclBoqRecord(saved);
 
-      // Create corresponding BOQ record in boqs table
+      // Create or update corresponding BOQ record in boqs table
       try {
         const customerInfo = {
           name: selectedCustomer.name,
@@ -187,7 +187,20 @@ export default function LCLTemplate() {
           country: selectedCustomer.country,
         };
 
-        await lclBoqService.createBOQFromLCLBOQ(saved, customerInfo);
+        const boqRecord = await lclBoqService.createBOQFromLCLBOQ(saved, customerInfo);
+
+        // Store the boq_id in lcl_boqs to maintain the relationship
+        if (boqRecord?.id && boqRecord.id !== saved.boq_id) {
+          await lclBoqService.saveLCLBOQ({
+            ...saved,
+            boq_id: boqRecord.id,
+          });
+          // Update local state to reflect the boq_id
+          setLclBoqRecord({
+            ...saved,
+            boq_id: boqRecord.id,
+          });
+        }
       } catch (boqCreateError) {
         console.error('Warning: Failed to create corresponding BOQ record:', boqCreateError);
         // Don't fail the save if BOQ creation fails, but warn the user

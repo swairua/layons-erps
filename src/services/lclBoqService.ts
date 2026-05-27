@@ -14,6 +14,7 @@ export interface LCLBOQRecord {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
+  boq_id?: string | null;
 }
 
 class LCLBOQService {
@@ -117,6 +118,7 @@ class LCLBOQService {
   /**
    * Create a corresponding BOQ record from an LCL BOQ
    * Uses upsert logic to handle re-saves (if same number exists, update it)
+   * Returns the created/updated BOQ with its ID so the relationship can be tracked
    */
   async createBOQFromLCLBOQ(
     lclBoq: LCLBOQRecord,
@@ -171,6 +173,22 @@ class LCLBOQService {
       created_by: createdBy,
     };
 
+    // Check if BOQ already exists by boq_id (for updates)
+    if (lclBoq.boq_id) {
+      const { data, error } = await supabase
+        .from('boqs')
+        .update({
+          ...boqRecord,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lclBoq.boq_id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as BOQData;
+    }
+
     // Check if BOQ with this number already exists for this company
     const { data: existingBoq } = await supabase
       .from('boqs')
@@ -180,7 +198,7 @@ class LCLBOQService {
       .single();
 
     if (existingBoq) {
-      // Update existing BOQ
+      // Update existing BOQ (shouldn't happen if boq_id is set, but fallback)
       const { data, error } = await supabase
         .from('boqs')
         .update({
