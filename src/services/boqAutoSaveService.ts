@@ -114,8 +114,9 @@ export async function saveBoqDraft(
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       // Unexpected error (not "no rows found")
-      console.error('[saveBoqDraft] Failed to check existing draft:', fetchError);
-      return { success: false, error: fetchError.message };
+      const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+      console.error('[saveBoqDraft] Failed to check existing draft:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     if (existingDraft?.id) {
@@ -129,8 +130,9 @@ export async function saveBoqDraft(
         .single();
 
       if (error) {
-        console.error('[saveBoqDraft] Update failed:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+        console.error('[saveBoqDraft] Update failed:', errorMsg);
+        return { success: false, error: errorMsg };
       }
       draftId = data?.id;
     } else {
@@ -143,8 +145,9 @@ export async function saveBoqDraft(
         .single();
 
       if (error) {
-        console.error('[saveBoqDraft] Insert failed:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+        console.error('[saveBoqDraft] Insert failed:', errorMsg);
+        return { success: false, error: errorMsg };
       }
       draftId = data?.id;
     }
@@ -185,7 +188,8 @@ export async function loadBoqDraft(
       .limit(1); // Only fetch one row
 
     if (error) {
-      console.error('[loadBoqDraft] Query error:', error);
+      const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+      console.error('[loadBoqDraft] Query error:', errorMsg);
       return null;
     }
 
@@ -231,8 +235,9 @@ export async function deleteDraft(
       .eq('boq_id', null); // Only delete create drafts
 
     if (error) {
-      console.error('[deleteDraft] Failed to delete BOQ draft:', error);
-      return { success: false, error: error.message };
+      const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+      console.error('[deleteDraft] Failed to delete BOQ draft:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     console.log('[deleteDraft] Successfully deleted draft');
@@ -268,7 +273,8 @@ export async function publishDraft(
       .single();
 
     if (fetchError) {
-      console.error('Failed to fetch draft for publishing:', fetchError);
+      const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+      console.error('Failed to fetch draft for publishing:', errorMsg);
       return { success: false, error: 'Draft not found' };
     }
 
@@ -303,8 +309,9 @@ export async function publishDraft(
       .single();
 
     if (insertError) {
-      console.error('Failed to publish draft:', insertError);
-      return { success: false, error: insertError.message };
+      const errorMsg = insertError instanceof Error ? insertError.message : (insertError?.message || JSON.stringify(insertError));
+      console.error('Failed to publish draft:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     // Delete the draft
@@ -314,7 +321,8 @@ export async function publishDraft(
       .eq('id', draftId);
 
     if (deleteError) {
-      console.error('Failed to delete draft after publishing:', deleteError);
+      const errorMsg = deleteError instanceof Error ? deleteError.message : (deleteError?.message || JSON.stringify(deleteError));
+      console.error('Failed to delete draft after publishing:', errorMsg);
       // Don't fail the operation, as the BOQ was already created
     }
 
@@ -382,8 +390,9 @@ export async function saveEditingDraft(
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       // Unexpected error (not "no rows found")
-      console.error('Failed to check existing edit draft:', fetchError);
-      return { success: false, error: fetchError.message };
+      const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+      console.error('Failed to check existing edit draft:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     if (existingDraft?.id) {
@@ -396,8 +405,9 @@ export async function saveEditingDraft(
         .single();
 
       if (error) {
-        console.error('Failed to update editing draft:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+        console.error('Failed to update editing draft:', errorMsg);
+        return { success: false, error: errorMsg };
       }
       draftId = data?.id;
     } else {
@@ -409,8 +419,9 @@ export async function saveEditingDraft(
         .single();
 
       if (error) {
-        console.error('Failed to insert editing draft:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+        console.error('Failed to insert editing draft:', errorMsg);
+        return { success: false, error: errorMsg };
       }
       draftId = data?.id;
     }
@@ -487,8 +498,9 @@ export async function deleteEditDraft(
       .eq('boq_id', boqId);
 
     if (error) {
-      console.error('Failed to delete edit draft:', error);
-      return { success: false, error: error.message };
+      const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+      console.error('Failed to delete edit draft:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     return { success: true };
@@ -582,8 +594,9 @@ export async function cleanupDuplicateDrafts(
       .order('updated_at', { ascending: false });
 
     if (fetchError) {
-      console.error('[cleanupDuplicateDrafts] Failed to fetch drafts:', fetchError);
-      return { success: false, error: fetchError.message };
+      const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+      console.error('[cleanupDuplicateDrafts] Failed to fetch drafts:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     if (!allDrafts || allDrafts.length <= 1) {
@@ -601,8 +614,9 @@ export async function cleanupDuplicateDrafts(
       .in('id', draftIdsToDelete);
 
     if (deleteError) {
-      console.error('[cleanupDuplicateDrafts] Failed to delete duplicates:', deleteError);
-      return { success: false, error: deleteError.message };
+      const errorMsg = deleteError instanceof Error ? deleteError.message : (deleteError?.message || JSON.stringify(deleteError));
+      console.error('[cleanupDuplicateDrafts] Failed to delete duplicates:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     console.log(`[cleanupDuplicateDrafts] Successfully deleted ${draftIdsToDelete.length} duplicate drafts`);
