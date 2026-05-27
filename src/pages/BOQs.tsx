@@ -23,7 +23,7 @@ import { useBOQs, useUnits } from '@/hooks/useDatabase';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAuditedDeleteOperations } from '@/hooks/useAuditedDeleteOperations';
 import { useConvertBoqToInvoice } from '@/hooks/useBOQ';
-import { loadBoqDraft, deleteDraft } from '@/services/boqAutoSaveService';
+import { loadBoqDraft, deleteDraft, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
 import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
@@ -68,10 +68,13 @@ export default function BOQs() {
     }
   }, [searchParams]);
 
-  // Check for unsaved draft when company changes
+  // Check for unsaved draft when company changes and cleanup duplicates
   useEffect(() => {
     const checkForDraft = async () => {
       if (companyId && profile?.id) {
+        // Cleanup duplicate drafts silently in the background
+        await cleanupDuplicateDrafts(profile.id, companyId);
+
         const draft = await loadBoqDraft(profile.id, companyId);
         if (draft) {
           setDraftExists(true);
