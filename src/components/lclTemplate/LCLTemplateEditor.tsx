@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, Check, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, ChevronRight, Trash2, Check, X, Edit2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -40,6 +40,11 @@ interface EditingState {
   rate: number;
 }
 
+interface InlineEdit {
+  qty?: number;
+  rate?: number;
+}
+
 export function LCLTemplateEditor({
   data,
   onDataUpdated,
@@ -53,8 +58,141 @@ export function LCLTemplateEditor({
   );
   const [editingItem, setEditingItem] = useState<EditingState | null>(null);
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
+  const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [loading, setLoading] = useState(false);
+  const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const { toast } = useToast();
+
+  // Calculate item amount with inline edits
+  const getItemAmount = (item: LCLItemWithCalculations): number => {
+    const edit = inlineEdits[item.id];
+    const qty = edit?.qty !== undefined ? edit.qty : (item.default_qty || 0);
+    const rate = edit?.rate !== undefined ? edit.rate : (item.default_rate || 0);
+    return qty * rate;
+  };
+
+  // Calculate totals with inline edits
+  const calculateTotals = () => {
+    const totals: { [sectionId: string]: { section: number; subsections: { [subId: string]: number } } } = {};
+
+    data.sections.forEach((section) => {
+      let sectionTotal = 0;
+      const subsectionTotals: { [subId: string]: number } = {};
+
+      section.subsections.forEach((subsection) => {
+        let subtotal = 0;
+        subsection.items.forEach((item) => {
+          subtotal += getItemAmount(item);
+        });
+        subsectionTotals[subsection.subsection_id] = subtotal;
+        sectionTotal += subtotal;
+      });
+
+      totals[section.section_id] = {
+        section: sectionTotal,
+        subsections: subsectionTotals,
+      };
+    });
+
+    return totals;
+  };
+
+  const totals = calculateTotals();
+
+  const getGrandTotal = (): number => {
+    return Object.values(totals).reduce((sum, t) => sum + t.section, 0);
+  };
+
+  const handleInlineQtyChange = (itemId: string, value: string) => {
+    const qty = parseFloat(value) || 0;
+    if (qty < 0) return;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], qty },
+    }));
+
+    // Debounce save
+    if (debounceTimers.current[itemId]) {
+      clearTimeout(debounceTimers.current[itemId]);
+    }
+
+    debounceTimers.current[itemId] = setTimeout(() => {
+      saveInlineEdit(itemId, qty, inlineEdits[itemId]?.rate);
+    }, 500);
+  };
+
+  const handleInlineRateChange = (itemId: string, value: string) => {
+    const rate = parseFloat(value) || 0;
+    if (rate < 0) return;
+
+    setInlineEdits((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], rate },
+    }));
+
+    // Debounce save
+    if (debounceTimers.current[itemId]) {
+      clearTimeout(debounceTimers.current[itemId]);
+    }
+
+    debounceTimers.current[itemId] = setTimeout(() => {
+      saveInlineEdit(itemId, inlineEdits[itemId]?.qty, rate);
+    }, 500);
+  };
+
+  const saveInlineEdit = async (itemId: string, newQty?: number, newRate?: number) => {
+    try {
+      const edit = inlineEdits[itemId];
+      const qtyToSave = newQty !== undefined ? newQty : edit?.qty;
+      const rateToSave = newRate !== undefined ? newRate : edit?.rate;
+
+      // Find the item to get current values
+      let currentItem: LCLItemWithCalculations | null = null;
+      for (const section of data.sections) {
+        for (const subsection of section.subsections) {
+          const item = subsection.items.find((i) => i.id === itemId);
+          if (item) {
+            currentItem = item;
+            break;
+          }
+        }
+        if (currentItem) break;
+      }
+
+      if (!currentItem) return;
+
+      await lclTemplateService.updateItem(itemId, {
+        description: currentItem.description,
+        unit: currentItem.unit,
+        default_qty: qtyToSave !== undefined ? qtyToSave : currentItem.default_qty,
+        default_rate: rateToSave !== undefined ? rateToSave : currentItem.default_rate,
+      });
+
+      // Clear the inline edit after successful save
+      setInlineEdits((prev) => {
+        const updated = { ...prev };
+        delete updated[itemId];
+        return updated;
+      });
+
+      await onDataUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to save changes',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Cleanup debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -233,7 +371,7 @@ export function LCLTemplateEditor({
           <p className="text-sm font-medium">
             Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              Ksh{data.grand_total.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+              Ksh{getGrandTotal().toLocaleString('en-KE', { maximumFractionDigits: 2 })}
             </span>
           </p>
         </div>
@@ -257,7 +395,7 @@ export function LCLTemplateEditor({
                 <h3 className="font-semibold">{section.section_name}</h3>
               </div>
               <p className="text-sm font-medium">
-                Section Total (KES): Ksh{section.total.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                Section Total (KES): Ksh{totals[section.section_id]?.section.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
               </p>
             </button>
 
@@ -284,7 +422,7 @@ export function LCLTemplateEditor({
                         </p>
                       </div>
                       <p className="text-sm">
-                        Subtotal (KES): Ksh{subsection.subtotal.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                        Subtotal (KES): Ksh{totals[section.section_id]?.subsections[subsection.subsection_id]?.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
                       </p>
                     </button>
 
@@ -298,7 +436,7 @@ export function LCLTemplateEditor({
                               <TableHead>Description</TableHead>
                               <TableHead className="w-24">Unit</TableHead>
                               <TableHead className="w-20">Qty</TableHead>
-                              <TableHead className="w-20">Rate</TableHead>
+                              <TableHead className="w-24">Rate</TableHead>
                               <TableHead className="w-24">Amount</TableHead>
                               <TableHead className="w-16">Actions</TableHead>
                             </TableRow>
@@ -372,11 +510,18 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-8 text-right text-sm"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   ) : (
-                                    (item.default_qty || 0).toFixed(2)
+                                    <Input
+                                      type="number"
+                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : item.default_qty || 0}
+                                      onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
+                                      disabled={loading}
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      step="0.01"
+                                    />
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm">
@@ -391,19 +536,24 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-8 text-right text-sm"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   ) : (
-                                    (item.default_rate || 0).toLocaleString('en-KE', {
-                                      maximumFractionDigits: 2,
-                                    })
+                                    <Input
+                                      type="number"
+                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : item.default_rate || 0}
+                                      onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
+                                      disabled={loading}
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      step="0.01"
+                                    />
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-semibold">
                                   {editingItem?.itemId === item.id
                                     ? amount.toLocaleString('en-KE', { maximumFractionDigits: 2 })
-                                    : item.amount.toLocaleString('en-KE', {
+                                    : getItemAmount(item).toLocaleString('en-KE', {
                                         maximumFractionDigits: 2,
                                       })}
                                 </TableCell>
@@ -430,15 +580,28 @@ export function LCLTemplateEditor({
                                       </Button>
                                     </div>
                                   ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => startEditingItem(item)}
-                                      disabled={loading}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => startEditingItem(item)}
+                                        disabled={loading}
+                                        className="h-8 w-8 p-0"
+                                        title="Edit description & unit"
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteItem(item.id)}
+                                        disabled={loading}
+                                        className="h-8 w-8 p-0"
+                                        title="Delete item"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -499,7 +662,7 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-8 text-right text-sm"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
@@ -515,7 +678,7 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-8 text-right text-sm"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
