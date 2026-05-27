@@ -11,7 +11,7 @@ async function fixSectionAOrder() {
   // Step 1: Query all items in the Section A
   const { data: items, error: fetchError } = await supabase
     .from('lcl_template_items')
-    .select('id, item_name, section_id, subsection_id, sort_order')
+    .select('id, description, section_id, subsection_id, sort_order')
     .eq('section_id', 'section_a')
     .order('sort_order', { ascending: true });
 
@@ -22,7 +22,7 @@ async function fixSectionAOrder() {
 
   console.log('Current Section A items:');
   items.forEach((item) => {
-    console.log(`  ID: ${item.id}, Name: ${item.item_name}, Current sort_order: ${item.sort_order}`);
+    console.log(`  ID: ${item.id}, Name: ${item.description}, Current sort_order: ${item.sort_order}`);
   });
   console.log();
 
@@ -42,11 +42,11 @@ async function fixSectionAOrder() {
   // Step 3: Build update statements
   const updates = [];
   for (const [itemName, newSortOrder] of Object.entries(correctOrder)) {
-    const item = items.find((i) => i.item_name === itemName);
+    const item = items.find((i) => i.description === itemName);
     if (item) {
       updates.push({
         id: item.id,
-        item_name: itemName,
+        description: itemName,
         old_sort_order: item.sort_order,
         new_sort_order: newSortOrder,
       });
@@ -58,7 +58,7 @@ async function fixSectionAOrder() {
   console.log('Planned updates:');
   updates.forEach((update) => {
     console.log(
-      `  ${update.item_name}: ${update.old_sort_order} → ${update.new_sort_order}`
+      `  ${update.description}: ${update.old_sort_order} → ${update.new_sort_order}`
     );
   });
   console.log();
@@ -73,12 +73,12 @@ async function fixSectionAOrder() {
 
     if (updateError) {
       console.error(
-        `Error updating ${update.item_name}:`,
+        `Error updating ${update.description}:`,
         updateError.message
       );
       process.exit(1);
     } else {
-      console.log(`✓ Updated ${update.item_name} (ID: ${update.id})`);
+      console.log(`✓ Updated ${update.description} (ID: ${update.id})`);
     }
   }
 
@@ -88,7 +88,7 @@ async function fixSectionAOrder() {
   // Step 5: Verify updates
   const { data: updatedItems, error: verifyError } = await supabase
     .from('lcl_template_items')
-    .select('item_name, sort_order')
+    .select('description, sort_order')
     .eq('section_id', 'section_a')
     .order('sort_order', { ascending: true });
 
@@ -99,7 +99,7 @@ async function fixSectionAOrder() {
 
   console.log('Updated Section A items (sorted by sort_order):');
   updatedItems.forEach((item) => {
-    console.log(`  ${item.sort_order}: ${item.item_name}`);
+    console.log(`  ${item.sort_order}: ${item.description}`);
   });
 
   console.log('\n✅ Verification complete! The order should now be:');
