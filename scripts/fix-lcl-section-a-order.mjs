@@ -8,11 +8,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 async function fixSectionAOrder() {
   console.log('Fetching Section A items from lcl_template_items...\n');
 
-  // Step 1: Query all items in the Section A
+  // Step 1: Query all items in Section A Materials subsection
   const { data: items, error: fetchError } = await supabase
     .from('lcl_template_items')
     .select('id, description, section_id, subsection_id, sort_order')
     .eq('section_id', 'section_a')
+    .eq('subsection_id', 'section_a_materials')
     .order('sort_order', { ascending: true });
 
   if (fetchError) {
@@ -20,7 +21,7 @@ async function fixSectionAOrder() {
     process.exit(1);
   }
 
-  console.log('Current Section A items:');
+  console.log('Current Section A Materials items:');
   items.forEach((item) => {
     console.log(`  ID: ${item.id}, Name: ${item.description}, Current sort_order: ${item.sort_order}`);
   });
@@ -90,6 +91,7 @@ async function fixSectionAOrder() {
     .from('lcl_template_items')
     .select('description, sort_order')
     .eq('section_id', 'section_a')
+    .eq('subsection_id', 'section_a_materials')
     .order('sort_order', { ascending: true });
 
   if (verifyError) {
@@ -97,7 +99,7 @@ async function fixSectionAOrder() {
     process.exit(1);
   }
 
-  console.log('Updated Section A items (sorted by sort_order):');
+  console.log('Updated Section A Materials items (sorted by sort_order):');
   updatedItems.forEach((item) => {
     console.log(`  ${item.sort_order}: ${item.description}`);
   });
