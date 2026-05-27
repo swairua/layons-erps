@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PaginationControls } from '@/components/pagination/PaginationControls';
 import { usePagination } from '@/hooks/usePagination';
-import { Layers, Plus, Eye, Download, Trash2, Copy, Pencil, FileText, Filter, Search, AlertCircle, Clock, CheckCircle, X } from 'lucide-react';
+import { Layers, Plus, Eye, Download, Trash2, Copy, Pencil, FileText, Filter, Search, AlertCircle, Clock, CheckCircle, X, Lock } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CreateBOQModal } from '@/components/boq/CreateBOQModal';
 import { CreatePercentageCopyModal } from '@/components/boq/CreatePercentageCopyModal';
@@ -39,6 +39,7 @@ export default function BOQs() {
   const [dueDateFromFilter, setDueDateFromFilter] = useState('');
   const [dueDateToFilter, setDueDateToFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'aging' | 'current'>('all');
+  const [linkedBOQIds, setLinkedBOQIds] = useState<Set<string>>(new Set());
 
   // Hooks and context calls first
   const { currentCompany } = useCurrentCompany();
@@ -59,6 +60,33 @@ export default function BOQs() {
   const [draftExists, setDraftExists] = useState(false);
   const [draftLastSaved, setDraftLastSaved] = useState<string | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+
+  // Helper function to refresh linked BOQ IDs
+  const refreshLinkedBOQIds = async () => {
+    if (!companyId) return;
+    try {
+      const { data, error } = await supabase
+        .from('lcl_boqs')
+        .select('boq_id')
+        .eq('company_id', companyId)
+        .not('boq_id', 'is', null);
+
+      if (error) {
+        console.error('Failed to fetch linked BOQ IDs:', error);
+        return;
+      }
+
+      const ids = new Set(data?.map((record: any) => record.boq_id).filter(Boolean) || []);
+      setLinkedBOQIds(ids);
+    } catch (err) {
+      console.error('Error fetching linked BOQ IDs:', err);
+    }
+  };
+
+  // Fetch linked BOQ IDs from lcl_boqs table
+  useEffect(() => {
+    refreshLinkedBOQIds();
+  }, [companyId]);
 
   // Set status filter from URL params
   useEffect(() => {
@@ -262,6 +290,13 @@ export default function BOQs() {
   };
 
   const handleDeleteClick = (id: string, number: string) => {
+    if (linkedBOQIds.has(id)) {
+      toast.error('Cannot delete BOQ', {
+        description: `This BOQ is linked to an LCL template. Edit it in the LCL Template instead.`,
+        duration: 5000
+      });
+      return;
+    }
     setDeleteDialog({ open: true, boqId: id, boqNumber: number });
   };
 
@@ -282,6 +317,13 @@ export default function BOQs() {
       toast.success('BOQ deleted');
       setDeleteDialog({ open: false });
       refetchBOQs();
+
+      // Also refresh linked BOQ IDs in case any lcl_boqs records were affected
+      setLinkedBOQIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(deleteDialog.boqId || '');
+        return updated;
+      });
     } catch (err) {
       let errorMessage = 'Failed to delete BOQ';
 
@@ -675,9 +717,17 @@ export default function BOQs() {
                         <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.project_title || '-'}</TableCell>
                         <TableCell className="text-xs md:text-sm"><Badge variant="outline" className="text-xs">{b.currency || 'KES'}</Badge></TableCell>
                         <TableCell className="text-xs md:text-sm">
-                          <Badge variant={b.status === 'converted' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'} className="text-xs">
-                            {b.status === 'draft' ? 'Draft' : b.status === 'converted' ? 'Converted' : 'Cancelled'}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={b.status === 'converted' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'} className="text-xs w-fit">
+                              {b.status === 'draft' ? 'Draft' : b.status === 'converted' ? 'Converted' : 'Cancelled'}
+                            </Badge>
+                            {linkedBOQIds.has(b.id) && (
+                              <Badge variant="outline" className="text-xs w-fit flex items-center gap-1">
+                                <Lock className="h-3 w-3" />
+                                Linked to LCL
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
                         <TableCell>
@@ -685,7 +735,14 @@ export default function BOQs() {
                             <Button size="icon" variant="ghost" onClick={() => setViewing(b)} title="View" className="h-8 w-8 md:h-9 md:w-9">
                               <Eye className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => setEditing(b)} title="Edit" className="h-8 w-8 md:h-9 md:w-9">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => !linkedBOQIds.has(b.id) && setEditing(b)}
+                              title={linkedBOQIds.has(b.id) ? "Read-only: Linked to LCL template" : "Edit"}
+                              disabled={linkedBOQIds.has(b.id)}
+                              className="h-8 w-8 md:h-9 md:w-9"
+                            >
                               <Pencil className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
                             <Button size="icon" variant="ghost" onClick={() => handleDownloadPDF(b)} title="Download PDF" className="h-8 w-8 md:h-9 md:w-9">
@@ -710,7 +767,7 @@ export default function BOQs() {
                               variant="outline"
                               onClick={() => handleConvertClick(b.id, b.number)}
                               title="Convert to Invoice"
-                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined}
+                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined || linkedBOQIds.has(b.id)}
                               className="h-8 w-8 md:h-9 md:w-9"
                             >
                               <FileText className="h-3 w-3 md:h-4 md:w-4" />
@@ -719,8 +776,8 @@ export default function BOQs() {
                               size="icon"
                               variant="destructive"
                               onClick={() => handleDeleteClick(b.id, b.number)}
-                              title={b.converted_to_invoice_id ? "Cannot delete converted BOQ" : "Delete"}
-                              disabled={!!b.converted_to_invoice_id}
+                              title={linkedBOQIds.has(b.id) ? "Cannot delete: Linked to LCL template" : b.converted_to_invoice_id ? "Cannot delete converted BOQ" : "Delete"}
+                              disabled={!!b.converted_to_invoice_id || linkedBOQIds.has(b.id)}
                               className="h-8 w-8 md:h-9 md:w-9"
                             >
                               <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
@@ -746,13 +803,19 @@ export default function BOQs() {
         </CardContent>
       </Card>
 
-      <CreateBOQModal open={open} onOpenChange={setOpen} onSuccess={() => refetchBOQs()} />
+      <CreateBOQModal open={open} onOpenChange={setOpen} onSuccess={() => {
+        refetchBOQs();
+        refreshLinkedBOQIds();
+      }} />
 
       <CreatePercentageCopyModal
         open={percentageCopyOpen}
         onOpenChange={setPercentageCopyOpen}
         companyId={companyId || ''}
-        onSuccess={() => refetchBOQs()}
+        onSuccess={() => {
+          refetchBOQs();
+          refreshLinkedBOQIds();
+        }}
       />
 
       {viewing && (() => {
@@ -918,7 +981,10 @@ export default function BOQs() {
           open={!!editing}
           onOpenChange={(isOpen) => setEditing(isOpen ? editing : null)}
           boq={editing}
-          onSuccess={() => refetchBOQs()}
+          onSuccess={() => {
+            refetchBOQs();
+            refreshLinkedBOQIds();
+          }}
         />
       )}
 
