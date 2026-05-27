@@ -1,4 +1,5 @@
 -- Create lcl_boqs table to store saved LCL BOQ documents
+-- This table stores LCL BOQ documents with customer info and item snapshots
 CREATE TABLE IF NOT EXISTS lcl_boqs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -12,7 +13,7 @@ CREATE TABLE IF NOT EXISTS lcl_boqs (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id),
   status TEXT DEFAULT 'saved', -- 'draft' or 'saved'
-  UNIQUE(company_id, number)
+  CONSTRAINT unique_lcl_boq_number UNIQUE(company_id, number)
 );
 
 -- Create indexes for better query performance

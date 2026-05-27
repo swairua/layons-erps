@@ -57,6 +57,7 @@ export default function LCLTemplate() {
             'LCL Default BOQ structure not found. Please contact support.',
           variant: 'destructive',
         });
+        setLoading(false);
         return;
       }
 
@@ -65,11 +66,18 @@ export default function LCLTemplate() {
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
       setHierarchicalData(data);
 
-      // Generate next BOQ number
-      const existingBoqs = await lclBoqService.getLCLBOQs(companyId);
-      const nextNumber = generateNextLCLBOQNumber(existingBoqs);
-      setBoqNumber(nextNumber);
+      // Generate next BOQ number - with error handling for table that may not exist yet
+      try {
+        const existingBoqs = await lclBoqService.getLCLBOQs(companyId);
+        const nextNumber = generateNextLCLBOQNumber(existingBoqs);
+        setBoqNumber(nextNumber);
+      } catch (boqError) {
+        // If lcl_boqs table doesn't exist yet, just use LCL-001
+        console.log('Note: lcl_boqs table not initialized, using default number');
+        setBoqNumber('LCL-001');
+      }
     } catch (error) {
+      console.error('Error loading LCL BOQ:', error);
       toast({
         title: 'Error',
         description:
@@ -173,10 +181,11 @@ export default function LCLTemplate() {
         description: 'LCL BOQ saved successfully.',
       });
     } catch (error) {
+      console.error('Error saving LCL BOQ:', error);
       toast({
         title: 'Error',
         description:
-          error instanceof Error ? error.message : 'Failed to save LCL BOQ',
+          error instanceof Error ? error.message : 'Failed to save LCL BOQ. Please ensure the database is properly configured.',
         variant: 'destructive',
       });
     } finally {
