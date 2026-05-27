@@ -436,7 +436,7 @@ export function LCLTemplateEditor({
                               <TableHead>Description</TableHead>
                               <TableHead className="w-24">Unit</TableHead>
                               <TableHead className="w-20">Qty</TableHead>
-                              <TableHead className="w-20">Rate</TableHead>
+                              <TableHead className="w-24">Rate</TableHead>
                               <TableHead className="w-24">Amount</TableHead>
                               <TableHead className="w-16">Actions</TableHead>
                             </TableRow>
@@ -510,7 +510,7 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-7 text-right text-2xs md:text-2xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   ) : (
@@ -519,7 +519,7 @@ export function LCLTemplateEditor({
                                       value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : item.default_qty || 0}
                                       onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-7 text-right text-2xs md:text-2xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   )}
@@ -536,7 +536,7 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-7 text-right text-2xs md:text-2xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   ) : (
@@ -545,7 +545,7 @@ export function LCLTemplateEditor({
                                       value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : item.default_rate || 0}
                                       onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-7 text-right text-2xs md:text-2xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
                                       step="0.01"
                                     />
                                   )}
