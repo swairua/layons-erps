@@ -53,7 +53,8 @@ export interface BOQDraftRecord {
 
 /**
  * Save or update a BOQ draft to the database.
- * Uses upsert logic (update if exists, insert if new).
+ * For create drafts (boq_id=null), loads existing draft first and updates by ID
+ * to avoid NULL comparison issues with the unique constraint.
  * Only one draft per user per company is allowed (for creating new BOQs).
  */
 export async function saveBoqDraft(
@@ -66,7 +67,7 @@ export async function saveBoqDraft(
       return { success: false, error: 'User ID and Company ID are required' };
     }
 
-    console.log(`[saveBoqDraft] Attempting upsert for company: ${companyId}, user: ${userId}`);
+    console.log(`[saveBoqDraft] Attempting save for company: ${companyId}, user: ${userId}`);
 
     // Prepare the payload matching the boq_drafts table schema
     const payload = {
@@ -99,22 +100,57 @@ export async function saveBoqDraft(
       last_autosaved_at: new Date().toISOString(),
     };
 
-    // Use upsert: on conflict (company_id, user_id, boq_id), update the existing draft
-    const { data, error } = await supabase
+    // Check if an existing create draft exists for this user/company
+    const { data: existingDraft, error: fetchError } = await supabase
       .from('boq_drafts')
-      .upsert([payload], {
-        onConflict: 'company_id,user_id,boq_id',
-      })
       .select('id')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .is('boq_id', null)
+      .limit(1)
       .single();
 
-    if (error) {
-      console.error('[saveBoqDraft] Upsert failed:', error);
-      return { success: false, error: error.message };
+    let draftId: string | undefined;
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      // Unexpected error (not "no rows found")
+      console.error('[saveBoqDraft] Failed to check existing draft:', fetchError);
+      return { success: false, error: fetchError.message };
     }
 
-    console.log(`[saveBoqDraft] Successfully saved/updated draft with ID: ${data?.id}`);
-    return { success: true, draftId: data?.id };
+    if (existingDraft?.id) {
+      // Update existing draft by ID
+      console.log(`[saveBoqDraft] Updating existing draft: ${existingDraft.id}`);
+      const { data, error } = await supabase
+        .from('boq_drafts')
+        .update(payload)
+        .eq('id', existingDraft.id)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[saveBoqDraft] Update failed:', error);
+        return { success: false, error: error.message };
+      }
+      draftId = data?.id;
+    } else {
+      // Insert new draft
+      console.log(`[saveBoqDraft] Creating new draft`);
+      const { data, error } = await supabase
+        .from('boq_drafts')
+        .insert([payload])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[saveBoqDraft] Insert failed:', error);
+        return { success: false, error: error.message };
+      }
+      draftId = data?.id;
+    }
+
+    console.log(`[saveBoqDraft] Successfully saved/updated draft with ID: ${draftId}`);
+    return { success: true, draftId };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error('[saveBoqDraft] Unexpected error:', errorMsg);
@@ -333,21 +369,53 @@ export async function saveEditingDraft(
       last_autosaved_at: new Date().toISOString(),
     };
 
-    // Use upsert: on conflict (company_id, user_id, boq_id), update the existing edit draft
-    const { data, error } = await supabase
+    // Check if an existing edit draft exists for this BOQ
+    const { data: existingDraft, error: fetchError } = await supabase
       .from('boq_drafts')
-      .upsert([payload], {
-        onConflict: 'company_id,user_id,boq_id',
-      })
       .select('id')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .eq('boq_id', boqId)
       .single();
 
-    if (error) {
-      console.error('Failed to save editing draft:', error);
-      return { success: false, error: error.message };
+    let draftId: string | undefined;
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      // Unexpected error (not "no rows found")
+      console.error('Failed to check existing edit draft:', fetchError);
+      return { success: false, error: fetchError.message };
     }
 
-    return { success: true, draftId: data?.id };
+    if (existingDraft?.id) {
+      // Update existing draft by ID
+      const { data, error } = await supabase
+        .from('boq_drafts')
+        .update(payload)
+        .eq('id', existingDraft.id)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to update editing draft:', error);
+        return { success: false, error: error.message };
+      }
+      draftId = data?.id;
+    } else {
+      // Insert new draft
+      const { data, error } = await supabase
+        .from('boq_drafts')
+        .insert([payload])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to insert editing draft:', error);
+        return { success: false, error: error.message };
+      }
+      draftId = data?.id;
+    }
+
+    return { success: true, draftId };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error('Error saving editing draft:', errorMsg);
@@ -428,6 +496,33 @@ export async function deleteEditDraft(
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error('Error deleting edit draft:', errorMsg);
     return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Check if a draft is stale based on its last autosaved timestamp.
+ * A draft is considered stale if it hasn't been autosaved within the specified timeframe.
+ * @param lastAutosavedAt ISO timestamp string
+ * @param maxAgeMs Maximum age in milliseconds (default 30 minutes)
+ * @returns true if draft is stale, false if it's fresh
+ */
+export function isDraftStale(lastAutosavedAt: string | null, maxAgeMs: number = 30 * 60 * 1000): boolean {
+  if (!lastAutosavedAt) return true;
+
+  try {
+    const lastSavedTime = new Date(lastAutosavedAt).getTime();
+    const ageMs = Date.now() - lastSavedTime;
+    const isStale = ageMs > maxAgeMs;
+
+    if (isStale) {
+      const minutes = Math.floor(ageMs / 60000);
+      console.log(`[isDraftStale] Draft is stale: last saved ${minutes} minutes ago, threshold is ${maxAgeMs / 60000} minutes`);
+    }
+
+    return isStale;
+  } catch (err) {
+    console.error('[isDraftStale] Error parsing timestamp:', err);
+    return true; // Consider malformed timestamps as stale
   }
 }
 
