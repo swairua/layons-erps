@@ -233,7 +233,7 @@ export function LCLTemplateEditor({
           <p className="text-sm font-medium">
             Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              Ksh{data.grand_total.toFixed(2)}
+              Ksh{data.grand_total.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
             </span>
           </p>
         </div>
@@ -257,7 +257,7 @@ export function LCLTemplateEditor({
                 <h3 className="font-semibold">{section.section_name}</h3>
               </div>
               <p className="text-sm font-medium">
-                Section Total (KES): Ksh{section.total.toFixed(2)}
+                Section Total (KES): Ksh{section.total.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
               </p>
             </button>
 
@@ -284,7 +284,7 @@ export function LCLTemplateEditor({
                         </p>
                       </div>
                       <p className="text-sm">
-                        Subtotal (KES): Ksh{subsection.subtotal.toFixed(2)}
+                        Subtotal (KES): Ksh{subsection.subtotal.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
                       </p>
                     </button>
 
@@ -313,10 +313,10 @@ export function LCLTemplateEditor({
                                     : ''
                                 }
                               >
-                                <TableCell className="text-xs font-medium">
+                                <TableCell className="text-sm">
                                   {item.item_number || '-'}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-sm">
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       value={editingItem.description}
@@ -327,15 +327,13 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-8"
+                                      className="h-8 text-sm"
                                     />
                                   ) : (
-                                    <span className="text-sm">
-                                      {item.description}
-                                    </span>
+                                    item.description
                                   )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-sm">
                                   {editingItem?.itemId === item.id ? (
                                     <Select
                                       value={editingItem.unit}
@@ -359,12 +357,10 @@ export function LCLTemplateEditor({
                                       </SelectContent>
                                     </Select>
                                   ) : (
-                                    <span className="text-xs">
-                                      {item.unit}
-                                    </span>
+                                    item.unit
                                   )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-right text-sm">
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
@@ -376,16 +372,14 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-8"
+                                      className="h-8 text-right text-sm"
                                       step="0.01"
                                     />
                                   ) : (
-                                    <span className="text-xs">
-                                      {(item.default_qty || 0).toFixed(2)}
-                                    </span>
+                                    (item.default_qty || 0).toFixed(2)
                                   )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-right text-sm">
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
@@ -397,21 +391,21 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-8"
+                                      className="h-8 text-right text-sm"
                                       step="0.01"
                                     />
                                   ) : (
-                                    <span className="text-xs">
-                                      {(item.default_rate || 0).toFixed(2)}
-                                    </span>
+                                    (item.default_rate || 0).toLocaleString('en-KE', {
+                                      maximumFractionDigits: 2,
+                                    })
                                   )}
                                 </TableCell>
-                                <TableCell>
-                                  <span className="text-xs font-medium">
-                                    {editingItem?.itemId === item.id
-                                      ? amount.toFixed(2)
-                                      : item.amount.toFixed(2)}
-                                  </span>
+                                <TableCell className="text-right text-sm font-semibold">
+                                  {editingItem?.itemId === item.id
+                                    ? amount.toLocaleString('en-KE', { maximumFractionDigits: 2 })
+                                    : item.amount.toLocaleString('en-KE', {
+                                        maximumFractionDigits: 2,
+                                      })}
                                 </TableCell>
                                 <TableCell>
                                   {editingItem?.itemId === item.id ? (
@@ -454,10 +448,10 @@ export function LCLTemplateEditor({
                             {addingItemTo === subsection.subsection_id &&
                             editingItem ? (
                               <TableRow className="bg-muted">
-                                <TableCell className="text-xs">
+                                <TableCell className="text-sm">
                                   {subsection.items.length + 1}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-sm">
                                   <Input
                                     value={editingItem.description}
                                     onChange={(e) =>
@@ -467,11 +461,11 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-8"
+                                    className="h-8 text-sm"
                                     placeholder="Description"
                                   />
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-sm">
                                   <Select
                                     value={editingItem.unit}
                                     onValueChange={(value) =>
@@ -494,7 +488,7 @@ export function LCLTemplateEditor({
                                     </SelectContent>
                                   </Select>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-right text-sm">
                                   <Input
                                     type="number"
                                     value={editingItem.qty}
@@ -505,12 +499,12 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-8"
+                                    className="h-8 text-right text-sm"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-right text-sm">
                                   <Input
                                     type="number"
                                     value={editingItem.rate}
@@ -521,15 +515,13 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-8"
+                                    className="h-8 text-right text-sm"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
                                 </TableCell>
-                                <TableCell>
-                                  <span className="text-xs font-medium">
-                                    {amount.toFixed(2)}
-                                  </span>
+                                <TableCell className="text-right text-sm font-semibold">
+                                  {amount.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
