@@ -33,19 +33,19 @@ SELECT
         jsonb_build_object('id', 'section_c_materials', 'name', 'Materials'),
         jsonb_build_object('id', 'section_c_labor', 'name', 'Labor')
       )),
-      jsonb_build_object('id', 'section_d', 'name', 'Section D: First Floor Walling and Columns', 'subsections', jsonb_build_array(
+      jsonb_build_object('id', 'section_d', 'name', 'Section D: First Floor Walling and Columns', 'parent_section_id', 'section_b', 'subsections', jsonb_build_array(
         jsonb_build_object('id', 'section_d_materials', 'name', 'Materials'),
         jsonb_build_object('id', 'section_d_labor', 'name', 'Labor')
       )),
-      jsonb_build_object('id', 'section_e', 'name', 'Section E: First Floor Suspended Slab', 'subsections', jsonb_build_array(
+      jsonb_build_object('id', 'section_e', 'name', 'Section E: First Floor Suspended Slab', 'parent_section_id', 'section_c', 'subsections', jsonb_build_array(
         jsonb_build_object('id', 'section_e_materials', 'name', 'Materials'),
         jsonb_build_object('id', 'section_e_labor', 'name', 'Labor')
       )),
-      jsonb_build_object('id', 'section_f', 'name', 'Section F: Second Floor Walling and Columns', 'subsections', jsonb_build_array(
+      jsonb_build_object('id', 'section_f', 'name', 'Section F: Second Floor Walling and Columns', 'parent_section_id', 'section_b', 'subsections', jsonb_build_array(
         jsonb_build_object('id', 'section_f_materials', 'name', 'Materials'),
         jsonb_build_object('id', 'section_f_labor', 'name', 'Labor')
       )),
-      jsonb_build_object('id', 'section_g', 'name', 'Section G: Second Floor Suspended Slab', 'subsections', jsonb_build_array(
+      jsonb_build_object('id', 'section_g', 'name', 'Section G: Second Floor Suspended Slab', 'parent_section_id', 'section_c', 'subsections', jsonb_build_array(
         jsonb_build_object('id', 'section_g_materials', 'name', 'Materials'),
         jsonb_build_object('id', 'section_g_labor', 'name', 'Labor')
       ))
@@ -188,97 +188,6 @@ LATERAL (
   SELECT 'section_c', 'section_c_labor', '4', 'Plumbing Works', 'Item', 1, 10000, 3 UNION ALL
   SELECT 'section_c', 'section_c_labor', '5', 'Concreting', 'Item', 1, 40000, 4 UNION ALL
   
-  -- SECTION D: FIRST FLOOR WALLING AND COLUMNS - MATERIALS
-  SELECT 'section_d', 'section_d_materials', '1', 'Machine Cut Stones 9 by 9', 'Pcs', 2800, 60, 0 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '2', 'Riversand', 'Trucks', 2, 30000, 1 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '3', 'Ballast', 'Trucks', 1, 30000, 2 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '4', 'Cement', 'Bags', 90, 850, 3 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '5', 'D 16', 'Pcs', 27, 2180, 4 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '6', 'D8', 'Pcs', 20, 530, 5 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '7', 'Binding wire', 'Rolls', 1, 2700, 6 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '8', 'Hacksaw Blades', 'Pcs', 10, 100, 7 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '9', 'Timber 6x1', 'Ft', 1000, 25, 8 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '10', 'Nails 3"', 'Kgs', 5, 180, 9 UNION ALL
-  SELECT 'section_d', 'section_d_materials', '11', 'Nails 4"', 'Kgs', 5, 180, 10 UNION ALL
-  
-  -- SECTION D: FIRST FLOOR WALLING AND COLUMNS - LABOR
-  SELECT 'section_d', 'section_d_labor', '1', 'Setting s Levelling', 'Item', 1, 12000, 0 UNION ALL
-  SELECT 'section_d', 'section_d_labor', '2', 'Bar Bending', 'Item', 1, 14000, 1 UNION ALL
-  SELECT 'section_d', 'section_d_labor', '3', 'Masonry Works', 'Item', 1, 150000, 2 UNION ALL
-  SELECT 'section_d', 'section_d_labor', '4', 'Column Formwork', 'Item', 1, 12000, 3 UNION ALL
-  SELECT 'section_d', 'section_d_labor', '5', 'Column Concreting', 'Item', 1, 16000, 4 UNION ALL
-  
-  -- SECTION E: FIRST FLOOR SUSPENDED SLAB - MATERIALS
-  SELECT 'section_e', 'section_e_materials', '1', 'Timber 3x2', 'Ft', 2000, 25, 0 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '2', 'Timber 6x1', 'Ft', 1500, 25, 1 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '3', 'Profiles', 'Pcs', 250, 180, 2 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '4', 'Trappers', 'Pcs', 180, 120, 3 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '5', 'Nails 4"', 'Bags', 1, 8000, 4 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '6', 'Nails 3"', 'Bags', 1, 8000, 5 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '7', 'D16', 'Item', 12, 2180, 6 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '8', 'D12', 'Item', 70, 1190, 7 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '9', 'D10', 'Item', 320, 825, 8 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '10', 'D8', 'Item', 80, 530, 9 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '11', 'Binding Wire', 'Item', 5, 2700, 10 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '12', 'Blades', 'Item', 20, 100, 11 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '13', 'Ballast', 'Item', 6, 30000, 12 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '14', 'Riversand', 'Item', 4, 30000, 13 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '15', 'Cement', 'Bags', 180, 850, 14 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '16', 'Electrical Items', 'Item', 1, 15000, 15 UNION ALL
-  SELECT 'section_e', 'section_e_materials', '17', 'Plumbing Items', 'Item', 1, 10000, 16 UNION ALL
-  
-  -- SECTION E: FIRST FLOOR SUSPENDED SLAB - LABOR
-  SELECT 'section_e', 'section_e_labor', '1', 'Formwork', 'Item', 1, 70000, 0 UNION ALL
-  SELECT 'section_e', 'section_e_labor', '2', 'Bar Bending', 'Item', 1, 60000, 1 UNION ALL
-  SELECT 'section_e', 'section_e_labor', '3', 'Electrical Works', 'Item', 1, 18000, 2 UNION ALL
-  SELECT 'section_e', 'section_e_labor', '4', 'Plumbing Works', 'Item', 1, 10000, 3 UNION ALL
-  SELECT 'section_e', 'section_e_labor', '5', 'Concreting', 'Item', 1, 40000, 4 UNION ALL
-  
-  -- SECTION F: SECOND FLOOR WALLING AND COLUMNS - MATERIALS
-  SELECT 'section_f', 'section_f_materials', '1', 'Machine Cut Stones 9x9', 'Pcs', 1400, 60, 0 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '2', 'Riversand', 'Trucks', 1, 30000, 1 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '3', 'Ballast', 'Trucks', 1, 30000, 2 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '4', 'Cement', 'Bags', 60, 850, 3 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '5', 'D16', 'Pcs', 14, 2180, 4 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '6', 'D8', 'Pcs', 10, 530, 5 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '7', 'Binding Wire', 'Rolls', 1, 2700, 6 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '8', 'Blades', 'Pcs', 5, 100, 7 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '9', 'Timber 6X1', 'Ft', 500, 25, 8 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '10', 'Nails 3"', 'Kgs', 3, 180, 9 UNION ALL
-  SELECT 'section_f', 'section_f_materials', '11', 'Nails 4"', 'Kgs', 3, 180, 10 UNION ALL
-  
-  -- SECTION F: SECOND FLOOR WALLING AND COLUMNS - LABOR
-  SELECT 'section_f', 'section_f_labor', '1', 'Setting $ Levelling', 'Item', 6, 12000, 0 UNION ALL
-  SELECT 'section_f', 'section_f_labor', '2', 'Bar Bending', 'Item', 7, 14000, 1 UNION ALL
-  SELECT 'section_f', 'section_f_labor', '3', 'Masonry Works', 'Item', 70, 140000, 2 UNION ALL
-  SELECT 'section_f', 'section_f_labor', '4', 'Column Formwork', 'Item', 6, 12000, 3 UNION ALL
-  SELECT 'section_f', 'section_f_labor', '5', 'Column Concreting', 'Item', 8, 16000, 4 UNION ALL
-  
-  -- SECTION G: SECOND FLOOR SUSPENDED SLAB - MATERIALS
-  SELECT 'section_g', 'section_g_materials', '1', 'Timber 3x2', 'Ft', 0, 25, 0 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '2', 'Timber 6x1', 'Ft', 0, 25, 1 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '3', 'Profiles', 'Pcs', 250, 180, 2 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '4', 'Trappers', 'Pcs', 90, 180, 3 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '5', 'Nails 4"', 'Kgs', 10, 8000, 4 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '6', 'Nails 3"', 'Kgs', 10, 8000, 5 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '7', 'D16', 'Pcs', 6, 2180, 6 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '8', 'D12', 'Pcs', 35, 1180, 7 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '9', 'D10', 'Pcs', 160, 825, 8 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '10', 'D8', 'Pcs', 40, 530, 9 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '11', 'Binding Wire', 'Pcs', 2, 2700, 10 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '12', 'Blades', 'Pcs', 10, 100, 11 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '13', 'Ballast', 'Trucks', 3, 30000, 12 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '14', 'Riversand', 'Trucks', 2, 30000, 13 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '15', 'Cement', 'Bags', 90, 850, 14 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '16', 'Electrical Items', 'Item', 1, 7500, 15 UNION ALL
-  SELECT 'section_g', 'section_g_materials', '17', 'Plumbing Items', 'Item', 1, 5000, 16 UNION ALL
-  
-  -- SECTION G: SECOND FLOOR SUSPENDED SLAB - LABOR
-  SELECT 'section_g', 'section_g_labor', '1', 'Formwork', 'Item', 1, 35000, 0 UNION ALL
-  SELECT 'section_g', 'section_g_labor', '2', 'Bar Bending', 'Item', 1, 30000, 1 UNION ALL
-  SELECT 'section_g', 'section_g_labor', '3', 'Electrical Works', 'Item', 1, 90000, 2 UNION ALL
-  SELECT 'section_g', 'section_g_labor', '4', 'Plumbing Works', 'Item', 1, 5000, 3 UNION ALL
-  SELECT 'section_g', 'section_g_labor', '5', 'Concreting', 'Item', 1, 30000, 4
 ) AS item(section_id, subsection_id, item_number, description, unit, qty, rate, sort_order)
 WHERE NOT EXISTS (
   SELECT 1 FROM lcl_template_items 
