@@ -62,6 +62,7 @@ export function EditLCLBOQModal({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
+  const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const { toast } = useToast();
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
@@ -146,6 +147,7 @@ export function EditLCLBOQModal({
     if (isOpen && boq.items_snapshot) {
       setItems(boq.items_snapshot);
       setInlineEdits({});
+      inlineEditsRef.current = {};
       setSaveStatus(null);
       const sections = extractSections(boq.items_snapshot);
       if (sections.length > 0) {
@@ -153,6 +155,16 @@ export function EditLCLBOQModal({
       }
     }
   }, [isOpen, boq]);
+
+  useEffect(() => {
+    inlineEditsRef.current = inlineEdits;
+  }, [inlineEdits]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   const getItemAmount = (item: ItemSnapshot, itemIndex: number): number => {
     const itemId = `item-${itemIndex}`;
@@ -175,8 +187,7 @@ export function EditLCLBOQModal({
     if (qty < 0) return;
 
     const itemId = `item-${itemIndex}`;
-    const currentEdit = inlineEdits[itemId] || {};
-    const finalQty = isNaN(qty) ? currentEdit.qty : qty;
+    const finalQty = isNaN(qty) ? 0 : qty;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -189,7 +200,13 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, finalQty, currentEdit.rate, currentEdit.description);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
@@ -198,8 +215,7 @@ export function EditLCLBOQModal({
     if (rate < 0) return;
 
     const itemId = `item-${itemIndex}`;
-    const currentEdit = inlineEdits[itemId] || {};
-    const finalRate = isNaN(rate) ? currentEdit.rate : rate;
+    const finalRate = isNaN(rate) ? 0 : rate;
 
     setInlineEdits((prev) => ({
       ...prev,
@@ -212,7 +228,13 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, currentEdit.qty, finalRate, currentEdit.description);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
@@ -229,7 +251,13 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, undefined, undefined, value);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
@@ -241,11 +269,15 @@ export function EditLCLBOQModal({
   ) => {
     setSaveStatus('saving');
     try {
+      const itemId = `item-${itemIndex}`;
+      const currentItem = items[itemIndex];
+      const edit = inlineEditsRef.current[itemId] || {};
+
       const updatedItems = items.map((item, idx) => {
         if (idx === itemIndex) {
-          const qty = newQty !== undefined ? newQty : item.qty;
-          const rate = newRate !== undefined ? newRate : item.rate;
-          const description = newDescription !== undefined ? newDescription : item.description;
+          const qty = edit.qty !== undefined ? edit.qty : item.qty;
+          const rate = edit.rate !== undefined ? edit.rate : item.rate;
+          const description = edit.description !== undefined ? edit.description : item.description;
           return {
             ...item,
             qty,
@@ -268,7 +300,7 @@ export function EditLCLBOQModal({
       // Clear the inline edits for this item only after successful save
       setInlineEdits((prev) => {
         const updated = { ...prev };
-        delete updated[`item-${itemIndex}`];
+        delete updated[itemId];
         return updated;
       });
 
