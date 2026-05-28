@@ -58,10 +58,9 @@ export function EditLCLBOQModal({
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'unsaved' | 'saving' | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const { toast } = useToast();
   const { currentCompany } = useCurrentCompany();
@@ -148,7 +147,6 @@ export function EditLCLBOQModal({
       setItems(boq.items_snapshot);
       setInlineEdits({});
       inlineEditsRef.current = {};
-      setSaveStatus(null);
       const sections = extractSections(boq.items_snapshot);
       if (sections.length > 0) {
         setActiveSection(sections[0]);
@@ -160,11 +158,6 @@ export function EditLCLBOQModal({
     inlineEditsRef.current = inlineEdits;
   }, [inlineEdits]);
 
-  useEffect(() => {
-    return () => {
-      Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
-    };
-  }, []);
 
   const getItemAmount = (item: ItemSnapshot, itemIndex: number): number => {
     const itemId = `item-${itemIndex}`;
@@ -194,20 +187,6 @@ export function EditLCLBOQModal({
       [itemId]: { ...prev[itemId], qty: finalQty },
     }));
     setSaveStatus('unsaved');
-
-    if (debounceTimers.current[itemId]) {
-      clearTimeout(debounceTimers.current[itemId]);
-    }
-
-    debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
-    }, 500);
   };
 
   const handleRateChange = (itemIndex: number, value: string) => {
@@ -222,20 +201,6 @@ export function EditLCLBOQModal({
       [itemId]: { ...prev[itemId], rate: finalRate },
     }));
     setSaveStatus('unsaved');
-
-    if (debounceTimers.current[itemId]) {
-      clearTimeout(debounceTimers.current[itemId]);
-    }
-
-    debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
-    }, 500);
   };
 
   const handleDescriptionChange = (itemIndex: number, value: string) => {
@@ -245,77 +210,8 @@ export function EditLCLBOQModal({
       [itemId]: { ...prev[itemId], description: value },
     }));
     setSaveStatus('unsaved');
-
-    if (debounceTimers.current[itemId]) {
-      clearTimeout(debounceTimers.current[itemId]);
-    }
-
-    debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
-    }, 500);
   };
 
-  const saveInlineEdit = async (
-    itemIndex: number,
-    newQty?: number,
-    newRate?: number,
-    newDescription?: string
-  ) => {
-    setSaveStatus('saving');
-    try {
-      const itemId = `item-${itemIndex}`;
-      const currentItem = items[itemIndex];
-      const edit = inlineEditsRef.current[itemId] || {};
-
-      const updatedItems = items.map((item, idx) => {
-        if (idx === itemIndex) {
-          const qty = edit.qty !== undefined ? edit.qty : item.qty;
-          const rate = edit.rate !== undefined ? edit.rate : item.rate;
-          const description = edit.description !== undefined ? edit.description : item.description;
-          return {
-            ...item,
-            qty,
-            rate,
-            description,
-            amount: qty * rate,
-          };
-        }
-        return item;
-      });
-
-      await lclBoqService.saveLCLBOQ({
-        ...boq,
-        items_snapshot: updatedItems,
-        updated_at: new Date().toISOString(),
-      });
-
-      setItems(updatedItems);
-
-      // Clear the inline edits for this item only after successful save
-      setInlineEdits((prev) => {
-        const updated = { ...prev };
-        delete updated[itemId];
-        return updated;
-      });
-
-      setSaveStatus('saved');
-    } catch (error) {
-      console.error('Error saving edit:', error);
-      setSaveStatus('unsaved');
-      toast({
-        title: 'Error',
-        description:
-          error instanceof Error ? error.message : 'Failed to save changes',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -361,15 +257,28 @@ export function EditLCLBOQModal({
   };
 
   const handleSaveAll = async () => {
-    // If all changes are already saved, just close
-    if (saveStatus === 'saved' && Object.keys(inlineEdits).length === 0) {
+    // If no unsaved changes, just close
+    if (Object.keys(inlineEdits).length === 0) {
       onClose();
       return;
     }
 
     setSaving(true);
+    setSaveStatus('saving');
     try {
-      // Apply any remaining unsaved inline edits to items
+      // Step 1: Validate boq.id exists before attempting save
+      if (!boq.id) {
+        console.error('CRITICAL: Cannot save BOQ - ID is missing', { boq });
+        throw new Error('Cannot save: BOQ ID is missing. This is a critical data issue. Please reload and try again.');
+      }
+
+      console.log('Starting BOQ save', {
+        boqId: boq.id,
+        editsCount: Object.keys(inlineEdits).length,
+        itemsCount: items.length
+      });
+
+      // Apply all inline edits to items
       const updatedItems = items.map((item, idx) => {
         const itemId = `item-${idx}`;
         const edit = inlineEdits[itemId];
@@ -387,17 +296,29 @@ export function EditLCLBOQModal({
         return item;
       });
 
-      // Only save if there are unsaved changes
-      if (Object.keys(inlineEdits).length > 0) {
-        await lclBoqService.saveLCLBOQ({
-          ...boq,
-          items_snapshot: updatedItems,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      const savePayload = {
+        ...boq,
+        items_snapshot: updatedItems,
+        updated_at: new Date().toISOString(),
+      };
 
+      console.log('Save payload prepared', {
+        id: savePayload.id,
+        itemsCount: updatedItems.length,
+        sampleItem: updatedItems[0]
+      });
+
+      const result = await lclBoqService.saveLCLBOQ(savePayload);
+
+      console.log('Save completed successfully', {
+        resultId: result.id,
+        updatedAt: result.updated_at
+      });
+
+      setItems(updatedItems);
       setInlineEdits({});
-      setSaveStatus('saved');
+      inlineEditsRef.current = {};
+
       toast({
         title: 'Success',
         description: 'BOQ updated successfully',
@@ -406,6 +327,7 @@ export function EditLCLBOQModal({
       onClose();
     } catch (error) {
       console.error('Error saving BOQ:', error);
+      setSaveStatus('unsaved');
       toast({
         title: 'Error',
         description:
@@ -467,32 +389,10 @@ export function EditLCLBOQModal({
         )}
 
         <div className="space-y-4">
-          {saveStatus && (
-            <div
-              className={`flex items-center gap-2 p-3 rounded text-sm ${
-                saveStatus === 'saving'
-                  ? 'bg-blue-50 text-blue-900'
-                  : saveStatus === 'saved'
-                    ? 'bg-green-50 text-green-900'
-                    : 'bg-yellow-50 text-yellow-900'
-              }`}
-            >
-              {saveStatus === 'saved' ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>All changes saved</span>
-                </>
-              ) : saveStatus === 'saving' ? (
-                <>
-                  <AlertCircle className="h-4 w-4 animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Unsaved changes</span>
-                </>
-              )}
+          {saveStatus === 'unsaved' && (
+            <div className="flex items-center gap-2 p-3 rounded text-sm bg-yellow-50 text-yellow-900">
+              <AlertCircle className="h-4 w-4" />
+              <span>Unsaved changes</span>
             </div>
           )}
 
@@ -595,7 +495,7 @@ export function EditLCLBOQModal({
           </Button>
           <Button
             onClick={handleSaveAll}
-            disabled={saving || saveStatus === 'saved'}
+            disabled={saving || Object.keys(inlineEdits).length === 0}
           >
             {saving ? 'Saving...' : 'Save All Changes'}
           </Button>
