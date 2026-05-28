@@ -3278,10 +3278,11 @@ export const generatePDF = async (data: DocumentData) => {
             let currentTable: string[] = [];
             let isFirstTable = true;
             let itemIndex = 0;
+            let lastSectionHeader = '';
 
             const closeTable = () => {
               if (currentTable.length > 0) {
-                tableHtml += `<table class="items-table" style="${!isFirstTable ? 'margin-top: 20px;' : ''}">
+                tableHtml += `<table class="items-table" style="${!isFirstTable ? 'margin-top: 12px;' : ''}">
                   <thead>
                     <tr>
                       <th style="width: 5%;">#</th>
@@ -3303,11 +3304,11 @@ export const generatePDF = async (data: DocumentData) => {
 
             data.items.forEach((item) => {
               if ((item as any)._isSectionHeader) {
-                // Close previous table and start a new one for this subsection
                 closeTable();
+                lastSectionHeader = item.description;
+                tableHtml += `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px; background-color: #f9f9f9; border-left: 3px solid #333;">${item.description}</div>`;
                 itemIndex = 1;
               } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
-                // Add subtotal row to current table
                 currentTable.push(`
                   <tr style="font-weight: bold; background-color: #f5f5f5;">
                     <td colspan="5" style="text-align: right;">${item.description}</td>
@@ -3315,7 +3316,6 @@ export const generatePDF = async (data: DocumentData) => {
                   </tr>
                 `);
               } else {
-                // Regular item row
                 currentTable.push(`
                   <tr>
                     <td>${itemIndex}</td>
