@@ -49,7 +49,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
     section.subsections.forEach((subsection) => {
       // Add subsection header
       flatItems.push({
-        description: `→ ${subsection.subsection_name}`,
+        description: `Subsection ${subsection.subsection_name}`,
         quantity: 0,
         unit_price: 0,
         line_total: 0,
