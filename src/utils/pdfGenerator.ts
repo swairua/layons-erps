@@ -918,117 +918,174 @@ export const generatePDF = async (data: DocumentData) => {
     let sectionRowsHtml = '';
     let itemNo = 0;
 
-    // Detect if subsections are present (items produced by boqPdfGenerator)
-    const hasSubsections = (data.items || []).some((it) => typeof it.description === 'string' && it.description.toLowerCase().includes('subsection'));
-
     // Keep track of section totals to compute final total as sum of section totals
     const sectionTotals: number[] = [];
 
-    // Helpers to detect row kinds
-    const isSectionHeader = (d: string) => /^section\s+[a-z]:\s*/i.test(d);
-    const isSubsectionHeader = (d: string) => /^\s*[→-]?\s*subsection\s+[^:]+:\s*/i.test(d);
-    const isSubsectionSubtotal = (d: string) => /^subsection\s+[^\s]+\s+subtotal\s*$/i.test(d);
-    const isSectionTotalRow = (d: string) => /^section\s+total$/i.test(d);
-
     let sectionCount = 0;
 
-    // Helper to create a table block for a section
-    const createSectionTable = (sectionTitle: string, sectionRows: string, isFirstSection: boolean): string => {
-      return `
-        <div class="section-block" style="page-break-before: ${isFirstSection ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstSection ? 'avoid' : 'page'};">
-          <table class="items" style="margin-bottom: 12mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm); page-break-after: auto;">
+    if (data.isLCLBOQ) {
+      // LCL BOQ: render section/subsection headers as div separators with per-subsection tables
+      let currentTableRows: string[] = [];
+      let isFirstTable = true;
+      let itemIndex = 0;
+
+      const closeTable = () => {
+        if (currentTableRows.length > 0) {
+          tablesHtml += `<table class="items" style="margin-bottom: 8mm;${!isFirstTable ? ' margin-top: 8px;' : ''}">
             <thead>
               <tr>
-                <th style="width:5%; font-weight: bold;">No</th>
-                <th style="width:55%; text-align:left; font-weight: bold;">DESCRIPTION</th>
-                <th style="width:8%; font-weight: bold;">QTY</th>
-                <th style="width:9%; font-weight: bold;">UNIT</th>
-                <th style="width:11%; font-weight: bold;">RATE (${data.currency || 'KES'})</th>
-                <th style="width:12%; text-align:right; font-weight: bold;">AMOUNT (${data.currency || 'KES'})</th>
+                <th style="width:5%; font-weight: bold;">#</th>
+                <th style="width:45%; text-align:left; font-weight: bold;">Item Description</th>
+                <th style="width:10%; font-weight: bold;">Qty</th>
+                <th style="width:10%; font-weight: bold;">Unit</th>
+                <th style="width:15%; font-weight: bold;">Rate (${data.currency || 'KES'})</th>
+                <th style="width:15%; text-align:right; font-weight: bold;">Amount (${data.currency || 'KES'})</th>
               </tr>
             </thead>
             <tbody>
-              <tr class="section-row-header"><td colspan="6" class="section-title-in-table" style="background:#f4f4f4; font-weight:700; padding: 8px 10px; line-height: 1.4; font-size: 9px; text-align: left; letter-spacing: 0.3px;">${sectionTitle}</td></tr>
-              ${sectionRows}
+              ${currentTableRows.join('')}
             </tbody>
-          </table>
-        </div>
-      `;
-    };
-
-    if (hasSubsections) {
-      (data.items || []).forEach((it) => {
-        const desc = String(it.description || '');
-
-        if (isSectionHeader(desc)) {
-          // Close previous section table if exists
-          if (currentSection && sectionRowsHtml) {
-            tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
-            sectionCount++;
-          }
-          // Start new section
-          currentSection = desc;
-          sectionRowsHtml = '';
-          itemNo = 0;
-          return;
+          </table>`;
+          currentTableRows = [];
+          isFirstTable = false;
         }
+      };
 
-        if (isSubsectionSubtotal(desc)) {
-          sectionRowsHtml += `<tr class=\"subsection-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">${desc}</td>\n          <td class=\"amount\">${formatCurrency(it.line_total || 0)}</td>\n        </tr>`;
-          return;
+      (data.items || []).forEach((item) => {
+        if ((item as any)._isSectionHeader) {
+          closeTable();
+          tablesHtml += `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px 10px; background-color: #f4f4f4; border-left: 3px solid #333; font-size: 11px;">${item.description}</div>`;
+          itemIndex = 1;
+        } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
+          currentTableRows.push(`<tr style="font-weight: bold; background-color: #f5f5f5;">
+            <td style="padding: 6px 8px;"></td>
+            <td colspan="4" style="text-align: right; padding: 6px 8px;">${item.description}</td>
+            <td style="text-align: right; padding: 6px 8px; font-weight: 700;">${formatCurrency(item.line_total)}</td>
+          </tr>`);
+        } else {
+          currentTableRows.push(`<tr>
+            <td style="padding: 4px 8px; text-align: center;">${itemIndex}</td>
+            <td style="padding: 4px 8px;">${item.description}</td>
+            <td style="padding: 4px 8px; text-align: center;">${item.quantity}</td>
+            <td style="padding: 4px 8px; text-align: center;">${(item as any).unit_of_measure || 'Item'}</td>
+            <td style="padding: 4px 8px; text-align: right;">${formatCurrency(item.unit_price)}</td>
+            <td style="padding: 4px 8px; text-align: right;">${formatCurrency(item.line_total)}</td>
+          </tr>`);
+          itemIndex++;
         }
-
-        if (isSubsectionHeader(desc)) {
-          itemNo = 0;
-          sectionRowsHtml += `<tr class=\"subsection-row\"><td class=\"num\"></td><td colspan=\"5\" class=\"subsection-title\">${desc.replace(/^\s*[→-]?\s*/, '')}</td></tr>`;
-          return;
-        }
-
-        if (isSectionTotalRow(desc)) {
-          const total = Number(it.line_total || 0);
-          sectionTotals.push(total);
-          sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(total)}</td>\n        </tr>`;
-          itemNo = 0;
-          return;
-        }
-
-        // Regular item row within subsection
-        itemNo += 1;
-        sectionRowsHtml += `<tr class=\"item-row\">\n        <td class=\"num\">${itemNo}</td>\n        <td class=\"desc\">${it.description}</td>\n        <td class=\"qty\">${it.quantity || ''}</td>\n        <td class=\"unit\">${(it as any).unit_abbreviation || it.unit_of_measure || ''}</td>\n        <td class=\"rate\">${formatCurrency(it.unit_price || 0)}</td>\n        <td class=\"amount\">${formatCurrency(it.line_total || 0)}</td>\n      </tr>`;
       });
-      // Flush last section
-      if (currentSection && sectionRowsHtml) {
-        tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
-      }
+
+      closeTable();
     } else {
-      // Legacy behavior: section headers are items with qty=0 and unit_price=0; totals are computed per section
-      let runningSectionTotal = 0;
-      (data.items || []).forEach((it) => {
-        const isSection = (it.quantity === 0 && it.unit_price === 0);
-        if (isSection) {
-          // Close previous section table if exists
-          if (itemNo > 0) {
-            sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(runningSectionTotal)}</td>\n        </tr>`;
-            sectionTotals.push(runningSectionTotal);
-            tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
-            sectionCount++;
+      // Non-LCL BOQ rendering
+
+      // Detect if subsections are present (items produced by boqPdfGenerator)
+      const hasSubsections = (data.items || []).some((it) => typeof it.description === 'string' && it.description.toLowerCase().includes('subsection'));
+
+      // Helpers to detect row kinds
+      const isSectionHeader = (d: string) => /^section\s+[a-z]:\s*/i.test(d);
+      const isSubsectionHeader = (d: string) => /^\s*[→-]?\s*subsection\s+[^:]+:\s*/i.test(d);
+      const isSubsectionSubtotal = (d: string) => /^subsection\s+[^\s]+\s+subtotal\s*$/i.test(d);
+      const isSectionTotalRow = (d: string) => /^section\s+total$/i.test(d);
+
+      // Helper to create a table block for a section
+      const createSectionTable = (sectionTitle: string, sectionRows: string, isFirstSection: boolean): string => {
+        return `
+          <div class="section-block" style="page-break-before: ${isFirstSection ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstSection ? 'avoid' : 'page'};">
+            <table class="items" style="margin-bottom: 12mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm); page-break-after: auto;">
+              <thead>
+                <tr>
+                  <th style="width:5%; font-weight: bold;">No</th>
+                  <th style="width:55%; text-align:left; font-weight: bold;">DESCRIPTION</th>
+                  <th style="width:8%; font-weight: bold;">QTY</th>
+                  <th style="width:9%; font-weight: bold;">UNIT</th>
+                  <th style="width:11%; font-weight: bold;">RATE (${data.currency || 'KES'})</th>
+                  <th style="width:12%; text-align:right; font-weight: bold;">AMOUNT (${data.currency || 'KES'})</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="section-row-header"><td colspan="6" class="section-title-in-table" style="background:#f4f4f4; font-weight:700; padding: 8px 10px; line-height: 1.4; font-size: 9px; text-align: left; letter-spacing: 0.3px;">${sectionTitle}</td></tr>
+                ${sectionRows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      };
+
+      if (hasSubsections) {
+        (data.items || []).forEach((it) => {
+          const desc = String(it.description || '');
+
+          if (isSectionHeader(desc)) {
+            // Close previous section table if exists
+            if (currentSection && sectionRowsHtml) {
+              tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
+              sectionCount++;
+            }
+            // Start new section
+            currentSection = desc;
+            sectionRowsHtml = '';
+            itemNo = 0;
+            return;
           }
-          runningSectionTotal = 0;
-          itemNo = 0;
-          currentSection = it.description;
-          sectionRowsHtml = '';
-          return;
+
+          if (isSubsectionSubtotal(desc)) {
+            sectionRowsHtml += `<tr class=\"subsection-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">${desc}</td>\n          <td class=\"amount\">${formatCurrency(it.line_total || 0)}</td>\n        </tr>`;
+            return;
+          }
+
+          if (isSubsectionHeader(desc)) {
+            itemNo = 0;
+            sectionRowsHtml += `<tr class=\"subsection-row\"><td class=\"num\"></td><td colspan=\"5\" class=\"subsection-title\">${desc.replace(/^\s*[→-]?\s*/, '')}</td></tr>`;
+            return;
+          }
+
+          if (isSectionTotalRow(desc)) {
+            const total = Number(it.line_total || 0);
+            sectionTotals.push(total);
+            sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(total)}</td>\n        </tr>`;
+            itemNo = 0;
+            return;
+          }
+
+          // Regular item row within subsection
+          itemNo += 1;
+          sectionRowsHtml += `<tr class=\"item-row\">\n        <td class=\"num\">${itemNo}</td>\n        <td class=\"desc\">${it.description}</td>\n        <td class=\"qty\">${it.quantity || ''}</td>\n        <td class=\"unit\">${(it as any).unit_abbreviation || it.unit_of_measure || ''}</td>\n        <td class=\"rate\">${formatCurrency(it.unit_price || 0)}</td>\n        <td class=\"amount\">${formatCurrency(it.line_total || 0)}</td>\n      </tr>`;
+        });
+        // Flush last section
+        if (currentSection && sectionRowsHtml) {
+          tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
         }
-        itemNo += 1;
-        const line = (it.line_total || 0);
-        runningSectionTotal += line;
-        sectionRowsHtml += `<tr class=\"item-row\">\n        <td class=\"num\">${itemNo}</td>\n        <td class=\"desc\">${it.description}</td>\n        <td class=\"qty\">${it.quantity || ''}</td>\n        <td class=\"unit\">${(it as any).unit_abbreviation || it.unit_of_measure || ''}</td>\n        <td class=\"rate\">${formatCurrency(it.unit_price || 0)}</td>\n        <td class=\"amount\">${formatCurrency(line)}</td>\n      </tr>`;
-      });
-      // Flush last section
-      if (itemNo > 0) {
-        sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(runningSectionTotal)}</td>\n        </tr>`;
-        sectionTotals.push(runningSectionTotal);
-        tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
+      } else {
+        // Legacy behavior: section headers are items with qty=0 and unit_price=0; totals are computed per section
+        let runningSectionTotal = 0;
+        (data.items || []).forEach((it) => {
+          const isSection = (it.quantity === 0 && it.unit_price === 0);
+          if (isSection) {
+            // Close previous section table if exists
+            if (itemNo > 0) {
+              sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(runningSectionTotal)}</td>\n        </tr>`;
+              sectionTotals.push(runningSectionTotal);
+              tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
+              sectionCount++;
+            }
+            runningSectionTotal = 0;
+            itemNo = 0;
+            currentSection = it.description;
+            sectionRowsHtml = '';
+            return;
+          }
+          itemNo += 1;
+          const line = (it.line_total || 0);
+          runningSectionTotal += line;
+          sectionRowsHtml += `<tr class=\"item-row\">\n        <td class=\"num\">${itemNo}</td>\n        <td class=\"desc\">${it.description}</td>\n        <td class=\"qty\">${it.quantity || ''}</td>\n        <td class=\"unit\">${(it as any).unit_abbreviation || it.unit_of_measure || ''}</td>\n        <td class=\"rate\">${formatCurrency(it.unit_price || 0)}</td>\n        <td class=\"amount\">${formatCurrency(line)}</td>\n      </tr>`;
+        });
+        // Flush last section
+        if (itemNo > 0) {
+          sectionRowsHtml += `<tr class=\"section-total\">\n          <td class=\"num\"></td>\n          <td colspan=\"4\" class=\"label\">SECTION TOTAL:</td>\n          <td class=\"amount\">${formatCurrency(runningSectionTotal)}</td>\n        </tr>`;
+          sectionTotals.push(runningSectionTotal);
+          tablesHtml += createSectionTable(currentSection, sectionRowsHtml, sectionCount === 0);
+        }
       }
     }
 
@@ -3281,90 +3338,6 @@ export const generatePDF = async (data: DocumentData) => {
         <!-- Items Section -->
         ${data.items && data.items.length > 0 ? `
         <div class="items-section">
-          ${(() => {
-            const isLCLBranch = data.isLCLBOQ && data.type === 'boq';
-            console.log('[generatePDF] Items section branch decision:', {
-              isLCLBOQ: data.isLCLBOQ,
-              type: data.type,
-              itemCount: data.items?.length,
-              isLCLBranch,
-              usingBranch: isLCLBranch ? 'LCL (table-splitting)' : 'Generic BOQ (single table)',
-            });
-            return isLCLBranch;
-          })() ? (() => {
-            console.log('[LCL BOQ] Rendering with LCL BOQ logic', {
-              isLCLBOQ: data.isLCLBOQ,
-              type: data.type,
-              itemCount: data.items?.length,
-            });
-            let tableHtml = '';
-            let currentTable: string[] = [];
-            let isFirstTable = true;
-            let itemIndex = 0;
-            let lastSectionHeader = '';
-
-            const closeTable = () => {
-              if (currentTable.length > 0) {
-                tableHtml += `<table class="items-table" style="${!isFirstTable ? 'margin-top: 12px;' : ''}">
-                  <thead>
-                    <tr>
-                      <th style="width: 5%;">#</th>
-                      <th style="width: 45%;">Item Description</th>
-                      <th style="width: 10%;">Qty</th>
-                      <th style="width: 10%;">Unit</th>
-                      <th style="width: 15%;">Rate</th>
-                      <th style="width: 15%;">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${currentTable.join('')}
-                  </tbody>
-                </table>`;
-                currentTable = [];
-                isFirstTable = false;
-              }
-            };
-
-            data.items.forEach((item, idx) => {
-              if (idx < 5) {
-                console.log(`[LCL BOQ] Item ${idx}:`, {
-                  description: item.description.substring(0, 50),
-                  _isSectionHeader: (item as any)._isSectionHeader,
-                  _isSubtotal: (item as any)._isSubtotal,
-                  _isSectionTotal: (item as any)._isSectionTotal,
-                  unit_of_measure: (item as any).unit_of_measure,
-                });
-              }
-              if ((item as any)._isSectionHeader) {
-                closeTable();
-                lastSectionHeader = item.description;
-                tableHtml += `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px; background-color: #f9f9f9; border-left: 3px solid #333;">${item.description}</div>`;
-                itemIndex = 1;
-              } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
-                currentTable.push(`
-                  <tr style="font-weight: bold; background-color: #f5f5f5;">
-                    <td colspan="5" style="text-align: right;">${item.description}</td>
-                    <td class="amount-cell">${formatCurrency(item.line_total)}</td>
-                  </tr>
-                `);
-              } else {
-                currentTable.push(`
-                  <tr>
-                    <td>${itemIndex}</td>
-                    <td class="description-cell">${item.description}</td>
-                    <td>${item.quantity}</td>
-                    <td>${(item as any).unit_of_measure || (item as any).unit || 'Item'}</td>
-                    <td class="amount-cell">${formatCurrency(item.unit_price)}</td>
-                    <td class="amount-cell">${formatCurrency(item.line_total)}</td>
-                  </tr>
-                `);
-                itemIndex++;
-              }
-            });
-
-            closeTable();
-            return tableHtml;
-          })() : `
           <table class="items-table">
             <thead>
               <tr>
@@ -3452,7 +3425,6 @@ export const generatePDF = async (data: DocumentData) => {
               `).join('')}
             </tbody>
           </table>
-          `}
         </div>
         ` : ''}
         
