@@ -62,6 +62,7 @@ export function EditLCLBOQModal({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
+  const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const { toast } = useToast();
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
@@ -146,13 +147,24 @@ export function EditLCLBOQModal({
     if (isOpen && boq.items_snapshot) {
       setItems(boq.items_snapshot);
       setInlineEdits({});
-      setSaveStatus('saved');
+      inlineEditsRef.current = {};
+      setSaveStatus(null);
       const sections = extractSections(boq.items_snapshot);
       if (sections.length > 0) {
         setActiveSection(sections[0]);
       }
     }
   }, [isOpen, boq]);
+
+  useEffect(() => {
+    inlineEditsRef.current = inlineEdits;
+  }, [inlineEdits]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   const getItemAmount = (item: ItemSnapshot, itemIndex: number): number => {
     const itemId = `item-${itemIndex}`;
@@ -171,13 +183,15 @@ export function EditLCLBOQModal({
   };
 
   const handleQtyChange = (itemIndex: number, value: string) => {
-    const qty = parseFloat(value) || 0;
+    const qty = value === '' ? 0 : parseFloat(value);
     if (qty < 0) return;
 
     const itemId = `item-${itemIndex}`;
+    const finalQty = isNaN(qty) ? 0 : qty;
+
     setInlineEdits((prev) => ({
       ...prev,
-      [itemId]: { ...prev[itemId], qty },
+      [itemId]: { ...prev[itemId], qty: finalQty },
     }));
     setSaveStatus('unsaved');
 
@@ -186,18 +200,26 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, qty, inlineEdits[itemId]?.rate);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
   const handleRateChange = (itemIndex: number, value: string) => {
-    const rate = parseFloat(value) || 0;
+    const rate = value === '' ? 0 : parseFloat(value);
     if (rate < 0) return;
 
     const itemId = `item-${itemIndex}`;
+    const finalRate = isNaN(rate) ? 0 : rate;
+
     setInlineEdits((prev) => ({
       ...prev,
-      [itemId]: { ...prev[itemId], rate },
+      [itemId]: { ...prev[itemId], rate: finalRate },
     }));
     setSaveStatus('unsaved');
 
@@ -206,7 +228,13 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, inlineEdits[itemId]?.qty, rate);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
@@ -223,7 +251,13 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemIndex, undefined, undefined, value);
+      const freshEdit = inlineEditsRef.current[itemId] || {};
+      saveInlineEdit(
+        itemIndex,
+        freshEdit.qty,
+        freshEdit.rate,
+        freshEdit.description
+      );
     }, 500);
   };
 
@@ -235,17 +269,21 @@ export function EditLCLBOQModal({
   ) => {
     setSaveStatus('saving');
     try {
+      const itemId = `item-${itemIndex}`;
+      const currentItem = items[itemIndex];
+      const edit = inlineEditsRef.current[itemId] || {};
+
       const updatedItems = items.map((item, idx) => {
         if (idx === itemIndex) {
-          const itemId = `item-${itemIndex}`;
-          const edit = inlineEdits[itemId];
+          const qty = edit.qty !== undefined ? edit.qty : item.qty;
+          const rate = edit.rate !== undefined ? edit.rate : item.rate;
+          const description = edit.description !== undefined ? edit.description : item.description;
           return {
             ...item,
-            qty: newQty !== undefined ? newQty : edit?.qty !== undefined ? edit.qty : item.qty,
-            rate: newRate !== undefined ? newRate : edit?.rate !== undefined ? edit.rate : item.rate,
-            description: newDescription !== undefined ? newDescription : edit?.description !== undefined ? edit.description : item.description,
-            amount: (newQty !== undefined ? newQty : (edit?.qty !== undefined ? edit.qty : item.qty)) * 
-                   (newRate !== undefined ? newRate : (edit?.rate !== undefined ? edit.rate : item.rate)),
+            qty,
+            rate,
+            description,
+            amount: qty * rate,
           };
         }
         return item;
@@ -259,10 +297,10 @@ export function EditLCLBOQModal({
 
       setItems(updatedItems);
 
-      // Clear the inline edits for this item after successful save
+      // Clear the inline edits for this item only after successful save
       setInlineEdits((prev) => {
         const updated = { ...prev };
-        delete updated[`item-${itemIndex}`];
+        delete updated[itemId];
         return updated;
       });
 
@@ -497,7 +535,7 @@ export function EditLCLBOQModal({
                       <TableCell>
                         <Input
                           type="number"
-                          value={qty}
+                          value={qty.toString()}
                           onChange={(e) => handleQtyChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"
@@ -507,7 +545,7 @@ export function EditLCLBOQModal({
                       <TableCell>
                         <Input
                           type="number"
-                          value={rate}
+                          value={rate.toString()}
                           onChange={(e) => handleRateChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"

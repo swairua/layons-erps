@@ -60,8 +60,8 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
 
       // Add items
       subsection.items.forEach((item: LCLItemWithCalculations) => {
-        const qty = safeN(item.default_qty);
-        const rate = safeN(item.default_rate);
+        const qty = safeN(item.qty);
+        const rate = safeN(item.rate);
         const amount = safeN(item.amount);
 
         flatItems.push({
