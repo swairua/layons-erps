@@ -19,7 +19,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { useCurrentCompany } from '@/contexts/CompanyContext';
+import { useCustomers } from '@/hooks/useDatabase';
+import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
+import { LCLHierarchicalData } from '@/types/lclTemplate';
 
 interface EditLCLBOQModalProps {
   isOpen: boolean;
@@ -55,14 +59,98 @@ export function EditLCLBOQModal({
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const { toast } = useToast();
+  const { currentCompany } = useCurrentCompany();
+  const { data: customers } = useCustomers(currentCompany?.id || '');
+
+  const extractSections = (itemsSnapshot: ItemSnapshot[]): string[] => {
+    const sectionsSet = new Set<string>();
+    itemsSnapshot.forEach((item) => {
+      // Extract section letter from section_id (e.g., "section-A" -> "A")
+      const match = item.section_id?.match(/section-([A-Z])/i);
+      if (match) {
+        sectionsSet.add(match[1].toUpperCase());
+      }
+    });
+    return Array.from(sectionsSet).sort();
+  };
+
+  const getItemsForSection = (sectionLetter: string): ItemSnapshot[] => {
+    return items.filter((item) => {
+      const match = item.section_id?.match(/section-([A-Z])/i);
+      return match && match[1].toUpperCase() === sectionLetter;
+    });
+  };
+
+  const reconstructHierarchicalData = (): LCLHierarchicalData => {
+    const sections: any[] = [];
+    const sectionLetters = extractSections(items);
+
+    sectionLetters.forEach((letter) => {
+      const sectionItems = getItemsForSection(letter);
+      const subsectionsMap = new Map<string, ItemSnapshot[]>();
+
+      sectionItems.forEach((item) => {
+        if (!subsectionsMap.has(item.subsection_id)) {
+          subsectionsMap.set(item.subsection_id, []);
+        }
+        subsectionsMap.get(item.subsection_id)?.push(item);
+      });
+
+      const subsections: any[] = [];
+      let sectionTotal = 0;
+
+      subsectionsMap.forEach((subsectionItems, subsectionId) => {
+        let subtotal = 0;
+        const processedItems = subsectionItems.map((item) => ({
+          ...item,
+          amount: item.qty * item.rate,
+        }));
+
+        subsectionItems.forEach((item) => {
+          subtotal += item.qty * item.rate;
+        });
+
+        subsections.push({
+          subsection_id: subsectionId,
+          subsection_name: subsectionItems[0]?.description || subsectionId,
+          items: processedItems,
+          subtotal,
+        });
+
+        sectionTotal += subtotal;
+      });
+
+      sections.push({
+        section_id: `section-${letter}`,
+        section_name: `SECTION ${letter}`,
+        subsections,
+        total: sectionTotal,
+      });
+    });
+
+    const grandTotal = sections.reduce((sum, sec) => sum + sec.total, 0);
+
+    return {
+      structure_id: 'reconstructed',
+      structure_name: 'Bill of Quantities',
+      sections,
+      grand_total: grandTotal,
+    };
+  };
 
   useEffect(() => {
     if (isOpen && boq.items_snapshot) {
       setItems(boq.items_snapshot);
       setInlineEdits({});
       setSaveStatus('saved');
+      const sections = extractSections(boq.items_snapshot);
+      if (sections.length > 0) {
+        setActiveSection(sections[0]);
+      }
     }
   }, [isOpen, boq]);
 
@@ -191,6 +279,49 @@ export function EditLCLBOQModal({
     }
   };
 
+  const handleDownloadPDF = async () => {
+    setDownloading(true);
+    try {
+      const customerInfo = boq.customer_id
+        ? customers?.find((c) => c.id === boq.customer_id)
+        : null;
+
+      const hierarchicalData = reconstructHierarchicalData();
+
+      await downloadLCLBOQPDF(
+        hierarchicalData,
+        boq.number,
+        boq.boq_date || new Date().toISOString().split('T')[0],
+        customerInfo?.name || 'Unknown Customer',
+        boq.project_title || '',
+        {
+          name: currentCompany?.name || '',
+          logo_url: currentCompany?.logo_url,
+          address: currentCompany?.address,
+          city: currentCompany?.city,
+          country: currentCompany?.country,
+          phone: currentCompany?.phone,
+          email: currentCompany?.email,
+        }
+      );
+
+      toast({
+        title: 'Success',
+        description: 'PDF downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to download PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleSaveAll = async () => {
     // If all changes are already saved, just close
     if (saveStatus === 'saved' && Object.keys(inlineEdits).length === 0) {
@@ -248,15 +379,54 @@ export function EditLCLBOQModal({
     }
   };
 
+  const sections = extractSections(items);
+  const currentSectionItems = activeSection ? getItemsForSection(activeSection) : [];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit LCL BOQ - {boq.number}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Edit LCL BOQ - {boq.number}</DialogTitle>
+              {activeSection && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Section {activeSection}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloading ? 'Downloading...' : 'Download PDF'}
+            </Button>
+          </div>
           <DialogDescription>
             Edit line items below. Changes are saved automatically.
           </DialogDescription>
         </DialogHeader>
+
+        {sections.length > 0 && (
+          <div className="flex gap-2 border-b pb-2">
+            {sections.map((section) => (
+              <button
+                key={section}
+                onClick={() => setActiveSection(section)}
+                className={`px-3 py-2 text-sm font-medium rounded-t border-b-2 transition-colors ${
+                  activeSection === section
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Section {section}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="space-y-4">
           {saveStatus && (
@@ -300,19 +470,24 @@ export function EditLCLBOQModal({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => {
-                  const itemId = `item-${index}`;
+                {currentSectionItems.map((item, sectionIndex) => {
+                  const fullIndex = items.findIndex(
+                    (i) =>
+                      i.item_number === item.item_number &&
+                      i.description === item.description
+                  );
+                  const itemId = `item-${fullIndex}`;
                   const edit = inlineEdits[itemId];
                   const qty = edit?.qty !== undefined ? edit.qty : item.qty;
                   const rate = edit?.rate !== undefined ? edit.rate : item.rate;
                   const amount = qty * rate;
 
                   return (
-                    <TableRow key={index}>
+                    <TableRow key={sectionIndex}>
                       <TableCell>
                         <Input
                           value={edit?.description !== undefined ? edit.description : item.description}
-                          onChange={(e) => handleDescriptionChange(index, e.target.value)}
+                          onChange={(e) => handleDescriptionChange(fullIndex, e.target.value)}
                           className="text-sm"
                         />
                       </TableCell>
@@ -323,7 +498,7 @@ export function EditLCLBOQModal({
                         <Input
                           type="number"
                           value={qty}
-                          onChange={(e) => handleQtyChange(index, e.target.value)}
+                          onChange={(e) => handleQtyChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"
                           min="0"
@@ -333,7 +508,7 @@ export function EditLCLBOQModal({
                         <Input
                           type="number"
                           value={rate}
-                          onChange={(e) => handleRateChange(index, e.target.value)}
+                          onChange={(e) => handleRateChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"
                           min="0"
@@ -349,14 +524,31 @@ export function EditLCLBOQModal({
             </Table>
           </div>
 
-          <div className="flex justify-end border-t pt-4">
-            <div className="text-right">
-              <div className="text-sm text-muted-foreground mb-2">Total Amount</div>
-              <div className="text-2xl font-bold">
-                {calculateTotals().toFixed(2)}
+          {activeSection && (
+            <div className="flex justify-end border-t pt-4">
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Section {activeSection} Total
+                </div>
+                <div className="text-2xl font-bold">
+                  {currentSectionItems
+                    .reduce((sum, item, idx) => {
+                      const fullIndex = items.findIndex(
+                        (i) =>
+                          i.item_number === item.item_number &&
+                          i.description === item.description
+                      );
+                      const itemId = `item-${fullIndex}`;
+                      const edit = inlineEdits[itemId];
+                      const qty = edit?.qty !== undefined ? edit.qty : item.qty;
+                      const rate = edit?.rate !== undefined ? edit.rate : item.rate;
+                      return sum + qty * rate;
+                    }, 0)
+                    .toFixed(2)}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter>
