@@ -618,7 +618,7 @@ export function LCLTemplateEditor({
                             {isFirstSubsection && (
                               <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default">
                                 <TableCell colSpan={7} className="text-sm font-bold text-gray-700 py-2">
-                                  SECTION {sectionLetter}: {section.section_name}
+                                  {section.section_name}
                                 </TableCell>
                               </TableRow>
                             )}
