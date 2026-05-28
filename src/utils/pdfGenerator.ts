@@ -926,12 +926,19 @@ export const generatePDF = async (data: DocumentData) => {
     if (data.isLCLBOQ) {
       // LCL BOQ: render section/subsection headers as div separators with per-subsection tables
       let currentTableRows: string[] = [];
+      let pendingHeaders: string[] = [];
       let isFirstTable = true;
       let itemIndex = 0;
 
       const closeTable = () => {
-        if (currentTableRows.length > 0) {
+        if (currentTableRows.length > 0 || pendingHeaders.length > 0) {
+          const headersHtml = pendingHeaders.map(h =>
+            `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px 10px; background-color: #f4f4f4; border-left: 3px solid #333; font-size: 11px;">${h}</div>`
+          ).join('');
+          pendingHeaders = [];
+
           tablesHtml += `<div class="section-block" style="page-break-before: ${isFirstTable ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstTable ? 'avoid' : 'page'};">
+            ${headersHtml}
             <table class="items" style="margin-bottom: 8mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm);${!isFirstTable ? ' margin-top: 8px;' : ''}">
               <thead>
                 <tr>
@@ -956,7 +963,7 @@ export const generatePDF = async (data: DocumentData) => {
       (data.items || []).forEach((item) => {
         if ((item as any)._isSectionHeader) {
           closeTable();
-          tablesHtml += `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px 10px; background-color: #f4f4f4; border-left: 3px solid #333; font-size: 11px;">${item.description}</div>`;
+          pendingHeaders.push(item.description);
           itemIndex = 1;
         } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
           currentTableRows.push(`<tr style="font-weight: bold; background-color: #f5f5f5;">
