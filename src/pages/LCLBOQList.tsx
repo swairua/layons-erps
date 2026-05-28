@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Download, Edit2, Trash2, Search } from 'lucide-react';
-import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
+import { downloadLCLBOQPDF, reconstructHierarchicalDataFromSnapshot } from '@/utils/lclBoqPdfGenerator';
 import { EditLCLBOQModal } from '@/components/lcl/EditLCLBOQModal';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
@@ -62,7 +62,7 @@ export default function LCLBOQList() {
   };
 
   const handleDownloadPDF = async (boq: LCLBOQRecord) => {
-    if (!boq.items_snapshot) {
+    if (!boq.items_snapshot || boq.items_snapshot.length === 0) {
       toast({
         title: 'Error',
         description: 'No items found in this BOQ',
@@ -77,18 +77,24 @@ export default function LCLBOQList() {
         ? customers?.find((c) => c.id === boq.customer_id)
         : null;
 
-      await downloadLCLBOQPDF({
-        number: boq.number,
-        customer_name: customerInfo?.name || 'Unknown Customer',
-        customer_email: customerInfo?.email || '',
-        customer_phone: customerInfo?.phone || '',
-        customer_address: customerInfo?.address || '',
-        customer_city: customerInfo?.city || '',
-        customer_country: customerInfo?.country || '',
-        project_title: boq.project_title || '',
-        boq_date: boq.boq_date || new Date().toISOString().split('T')[0],
-        items_snapshot: boq.items_snapshot,
-      });
+      const hierarchicalData = reconstructHierarchicalDataFromSnapshot(boq.items_snapshot);
+
+      await downloadLCLBOQPDF(
+        hierarchicalData,
+        boq.number,
+        boq.boq_date || new Date().toISOString().split('T')[0],
+        customerInfo?.name || 'Unknown Customer',
+        boq.project_title || '',
+        currentCompany ? {
+          name: currentCompany.name || '',
+          logo_url: currentCompany.logo_url,
+          address: currentCompany.address,
+          city: currentCompany.city,
+          country: currentCompany.country,
+          phone: currentCompany.phone,
+          email: currentCompany.email,
+        } : undefined
+      );
 
       toast({
         title: 'Success',

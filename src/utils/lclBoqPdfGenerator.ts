@@ -3,6 +3,17 @@ import { LCLHierarchicalData, LCLItemWithCalculations } from '@/types/lclTemplat
 
 const safeN = (v: number | undefined) => (typeof v === 'number' && !isNaN(v) ? v : 0);
 
+export interface ItemSnapshot {
+  section_id: string;
+  subsection_id: string;
+  item_number: string;
+  description: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
 export interface LCLBOQPdfOptions {
   customTitle?: string;
   stampImageUrl?: string;
@@ -100,6 +111,78 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
   });
 
   return flatItems;
+}
+
+/**
+ * Reconstructs hierarchical data from a flat items snapshot.
+ * Converts flat array of items back to the hierarchical structure expected by downloadLCLBOQPDF.
+ */
+export function reconstructHierarchicalDataFromSnapshot(
+  flatItems: ItemSnapshot[]
+): LCLHierarchicalData {
+  const sectionsMap = new Map<string, Map<string, ItemSnapshot[]>>();
+
+  flatItems.forEach((item) => {
+    if (!sectionsMap.has(item.section_id)) {
+      sectionsMap.set(item.section_id, new Map());
+    }
+
+    const subsectionsMap = sectionsMap.get(item.section_id)!;
+    if (!subsectionsMap.has(item.subsection_id)) {
+      subsectionsMap.set(item.subsection_id, []);
+    }
+
+    subsectionsMap.get(item.subsection_id)!.push(item);
+  });
+
+  const sections: any[] = [];
+  let grandTotal = 0;
+
+  sectionsMap.forEach((subsectionsMap, sectionId) => {
+    const subsections: any[] = [];
+    let sectionTotal = 0;
+
+    subsectionsMap.forEach((items, subsectionId) => {
+      let subtotal = 0;
+
+      const processedItems = items.map((item) => ({
+        ...item,
+        qty: safeN(item.qty),
+        rate: safeN(item.rate),
+        amount: safeN(item.qty) * safeN(item.rate),
+      }));
+
+      processedItems.forEach((item) => {
+        subtotal += item.amount;
+      });
+
+      subsections.push({
+        subsection_id: subsectionId,
+        subsection_name: subsectionId,
+        items: processedItems,
+        subtotal,
+      });
+
+      sectionTotal += subtotal;
+    });
+
+    const sectionLetter = sectionId.replace('section-', '').toUpperCase();
+    sections.push({
+      section_id: sectionId,
+      section_name: `SECTION ${sectionLetter}`,
+      subsections,
+      total: sectionTotal,
+    });
+
+    grandTotal += sectionTotal;
+  });
+
+  return {
+    structure_id: 'reconstructed',
+    structure_name: 'Bill of Quantities',
+    sections,
+    grand_total: grandTotal,
+  };
 }
 
 export async function downloadLCLBOQPDF(
