@@ -23,13 +23,14 @@ import { CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
-import { LCLHierarchicalData } from '@/types/lclTemplate';
+import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 
 interface EditLCLBOQModalProps {
   isOpen: boolean;
   onClose: () => void;
   boq: LCLBOQRecord;
   onSaved: () => Promise<void>;
+  templateStructure?: LCLTemplateStructure;
 }
 
 interface InlineEdit {
@@ -56,6 +57,7 @@ export function EditLCLBOQModal({
   onClose,
   boq,
   onSaved,
+  templateStructure,
 }: EditLCLBOQModalProps) {
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
@@ -68,6 +70,20 @@ export function EditLCLBOQModal({
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
 
+  // Helper function to get section name from template or items snapshot
+  const getSectionNameFromTemplate = (sectionId: string): string | undefined => {
+    if (!templateStructure || !templateStructure.structure_data?.sections) {
+      return undefined;
+    }
+
+    const match = sectionId?.match(/section_([a-z])/i);
+    if (!match) return undefined;
+
+    const sectionIndex = match[1].toUpperCase().charCodeAt(0) - 65; // Convert A->0, B->1, etc.
+    const section = templateStructure.structure_data.sections[sectionIndex];
+    return section?.name;
+  };
+
   const extractSections = (itemsSnapshot: ItemSnapshot[]): Array<{ letter: string; name?: string }> => {
     const sectionsMap = new Map<string, { letter: string; name?: string }>();
     itemsSnapshot.forEach((item) => {
@@ -75,9 +91,11 @@ export function EditLCLBOQModal({
       if (match) {
         const letter = match[1].toUpperCase();
         if (!sectionsMap.has(letter)) {
+          // Use section_name from snapshot, or fallback to template
+          const sectionName = item.section_name || getSectionNameFromTemplate(item.section_id);
           sectionsMap.set(letter, {
             letter,
-            name: item.section_name,
+            name: sectionName,
           });
         }
       }
@@ -97,7 +115,9 @@ export function EditLCLBOQModal({
       const match = item.section_id?.match(/section_([a-z])/i);
       return match && match[1].toUpperCase() === sectionLetter;
     });
-    return sectionItem?.section_name || `SECTION ${sectionLetter}`;
+    // Use section_name from snapshot, or fallback to template, or use generic name
+    const name = sectionItem?.section_name || getSectionNameFromTemplate(sectionItem?.section_id);
+    return name ? `SECTION ${sectionLetter}: ${name}` : `SECTION ${sectionLetter}`;
   };
 
   const reconstructHierarchicalData = (): LCLHierarchicalData => {
@@ -409,7 +429,7 @@ export function EditLCLBOQModal({
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {section.name ? `${section.letter}: ${section.name}` : `Section ${section.letter}`}
+                {section.name ? `${section.letter}: ${section.name}` : `SECTION ${section.letter}`}
               </button>
             ))}
           </div>
