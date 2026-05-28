@@ -794,6 +794,11 @@ export const generatePDF = async (data: DocumentData) => {
   console.log('📋 Items count:', data.items?.length || 0);
   console.log('📑 Sections count:', data.sections?.length || 0);
   console.log('💰 Total amount:', data.total_amount);
+  console.log('[generatePDF] LCL BOQ flags:', {
+    isLCLBOQ: data.isLCLBOQ,
+    type: data.type,
+    willUseLCLBranch: data.isLCLBOQ && data.type === 'boq',
+  });
 
   // Extract theme color variables from the main document so PDFs match the app theme
   const computed = typeof window !== 'undefined' ? getComputedStyle(document.documentElement) : null;
@@ -3276,7 +3281,17 @@ export const generatePDF = async (data: DocumentData) => {
         <!-- Items Section -->
         ${data.items && data.items.length > 0 ? `
         <div class="items-section">
-          ${data.isLCLBOQ && data.type === 'boq' ? (() => {
+          ${(() => {
+            const isLCLBranch = data.isLCLBOQ && data.type === 'boq';
+            console.log('[generatePDF] Items section branch decision:', {
+              isLCLBOQ: data.isLCLBOQ,
+              type: data.type,
+              itemCount: data.items?.length,
+              isLCLBranch,
+              usingBranch: isLCLBranch ? 'LCL (table-splitting)' : 'Generic BOQ (single table)',
+            });
+            return isLCLBranch;
+          })() ? (() => {
             console.log('[LCL BOQ] Rendering with LCL BOQ logic', {
               isLCLBOQ: data.isLCLBOQ,
               type: data.type,

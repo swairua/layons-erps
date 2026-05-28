@@ -201,8 +201,8 @@ export async function downloadLCLBOQPDF(
   const currency = 'KES';
   const subtotal = data.grand_total;
 
-  return await generatePDF({
-    type: 'boq',
+  const pdfData = {
+    type: 'boq' as const,
     number: boqNumber,
     date: boqDate,
     company,
@@ -219,5 +219,15 @@ export async function downloadLCLBOQPDF(
     customTitle: options?.customTitle,
     stampImageUrl: options?.stampImageUrl,
     isLCLBOQ: true,
+  };
+
+  console.log('[downloadLCLBOQPDF] Data being passed to generatePDF:', {
+    isLCLBOQ: pdfData.isLCLBOQ,
+    type: pdfData.type,
+    itemCount: pdfData.items?.length,
+    firstItemSectionHeader: pdfData.items?.[0]?._isSectionHeader,
+    secondItemSectionHeader: pdfData.items?.[1]?._isSectionHeader,
   });
+
+  return await generatePDF(pdfData);
 }
