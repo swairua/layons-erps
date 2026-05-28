@@ -52,8 +52,11 @@ class LCLBOQService {
   async saveLCLBOQ(boq: LCLBOQRecord): Promise<LCLBOQRecord> {
     const { id, ...data } = boq;
 
+    console.log('saveLCLBOQ called', { id, hasId: !!id, dataKeys: Object.keys(data) });
+
     if (id) {
       // Update existing
+      console.log('Performing UPDATE on lcl_boqs', { id });
       const { data: updated, error } = await supabase
         .from('lcl_boqs')
         .update({
@@ -64,10 +67,16 @@ class LCLBOQService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('UPDATE error on lcl_boqs', { id, error });
+        throw error;
+      }
+
+      console.log('UPDATE successful', { id, updatedId: updated?.id, updatedAt: updated?.updated_at });
       return updated as LCLBOQRecord;
     } else {
       // Create new
+      console.log('Performing INSERT on lcl_boqs (no id provided)');
       const { data: created, error } = await supabase
         .from('lcl_boqs')
         .insert({
@@ -78,7 +87,12 @@ class LCLBOQService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('INSERT error on lcl_boqs', { error });
+        throw error;
+      }
+
+      console.log('INSERT successful', { createdId: created?.id });
       return created as LCLBOQRecord;
     }
   }

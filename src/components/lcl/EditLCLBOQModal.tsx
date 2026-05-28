@@ -266,6 +266,18 @@ export function EditLCLBOQModal({
     setSaving(true);
     setSaveStatus('saving');
     try {
+      // Step 1: Validate boq.id exists before attempting save
+      if (!boq.id) {
+        console.error('CRITICAL: Cannot save BOQ - ID is missing', { boq });
+        throw new Error('Cannot save: BOQ ID is missing. This is a critical data issue. Please reload and try again.');
+      }
+
+      console.log('Starting BOQ save', {
+        boqId: boq.id,
+        editsCount: Object.keys(inlineEdits).length,
+        itemsCount: items.length
+      });
+
       // Apply all inline edits to items
       const updatedItems = items.map((item, idx) => {
         const itemId = `item-${idx}`;
@@ -284,10 +296,23 @@ export function EditLCLBOQModal({
         return item;
       });
 
-      await lclBoqService.saveLCLBOQ({
+      const savePayload = {
         ...boq,
         items_snapshot: updatedItems,
         updated_at: new Date().toISOString(),
+      };
+
+      console.log('Save payload prepared', {
+        id: savePayload.id,
+        itemsCount: updatedItems.length,
+        sampleItem: updatedItems[0]
+      });
+
+      const result = await lclBoqService.saveLCLBOQ(savePayload);
+
+      console.log('Save completed successfully', {
+        resultId: result.id,
+        updatedAt: result.updated_at
       });
 
       setItems(updatedItems);
