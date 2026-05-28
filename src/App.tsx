@@ -278,272 +278,336 @@ const App = () => {
         <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
         <Routes>
           {/* Dashboard */}
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Sales & Customer Management */}
-          <Route 
-            path="/quotations" 
+          <Route
+            path="/quotations"
             element={
-              <ProtectedRoute>
-                <Quotations />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Quotations />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/quotations/new" 
+          <Route
+            path="/quotations/new"
             element={
-              <ProtectedRoute>
-                <Quotations />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Quotations />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/customers" 
+          <Route
+            path="/customers"
             element={
-              <ProtectedRoute>
-                <Customers />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Customers />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/customers/new" 
+          <Route
+            path="/customers/new"
             element={
-              <ProtectedRoute>
-                <Customers />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Customers />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Financial Management */}
-          <Route 
-            path="/invoices" 
+          <Route
+            path="/invoices"
             element={
-              <ProtectedRoute>
-                <Invoices />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Invoices />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
           <Route
             path="/invoices/new"
             element={
-              <ProtectedRoute>
-                <Invoices />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Invoices />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/cash-receipts"
             element={
-              <ProtectedRoute>
-                <CashReceipts />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <CashReceipts />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/cash-receipts/new"
             element={
-              <ProtectedRoute>
-                <CashReceipts />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <CashReceipts />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
-            path="/payments" 
+            path="/payments"
             element={
-              <ProtectedRoute>
-                <Payments />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Payments />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
           <Route
             path="/payments/new"
             element={
-              <ProtectedRoute>
-                <Payments />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Payments />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/receipts"
             element={
-              <ProtectedRoute>
-                <Payments />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Payments />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
-            path="/credit-notes" 
+            path="/credit-notes"
             element={
-              <ProtectedRoute>
-                <CreditNotes />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <CreditNotes />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/credit-notes/new" 
+          <Route
+            path="/credit-notes/new"
             element={
-              <ProtectedRoute>
-                <CreditNotes />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <CreditNotes />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/proforma" 
+          <Route
+            path="/proforma"
             element={
-              <ProtectedRoute>
-                <Proforma />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Proforma />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Procurement & Inventory */}
           <Route
             path="/boqs"
             element={
-              <ProtectedRoute>
-                <BOQs />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <BOQs />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/fixed-boq"
             element={
-              <ProtectedRoute>
-                <FixedBOQ />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <FixedBOQ />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/lcl-template"
             element={
-              <ProtectedRoute>
-                <LCLTemplate />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <LCLTemplate />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/lcl-boq-list"
             element={
-              <ProtectedRoute>
-                <LCLBOQList />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <LCLBOQList />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/lpos"
             element={
-              <ProtectedRoute>
-                <LPOs />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <LPOs />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
-          <Route 
-            path="/lpos/new" 
+          <Route
+            path="/lpos/new"
             element={
-              <ProtectedRoute>
-                <LPOs />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <LPOs />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/inventory" 
+          <Route
+            path="/inventory"
             element={
-              <ProtectedRoute>
-                <Inventory />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Inventory />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/inventory/new" 
+          <Route
+            path="/inventory/new"
             element={
-              <ProtectedRoute>
-                <Inventory />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <Inventory />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/delivery-notes" 
+          <Route
+            path="/delivery-notes"
             element={
-              <ProtectedRoute>
-                <DeliveryNotes />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <DeliveryNotes />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Additional Features */}
-          <Route 
-            path="/remittance" 
+          <Route
+            path="/remittance"
             element={
-              <ProtectedRoute>
-                <RemittanceAdvice />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <RemittanceAdvice />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Reports */}
-          <Route 
-            path="/reports/sales" 
+          <Route
+            path="/reports/sales"
             element={
-              <ProtectedRoute>
-                <SalesReports />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <SalesReports />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/reports/inventory" 
+          <Route
+            path="/reports/inventory"
             element={
-              <ProtectedRoute>
-                <InventoryReports />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <InventoryReports />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
-          <Route 
-            path="/reports/statements" 
+          <Route
+            path="/reports/statements"
             element={
-              <ProtectedRoute>
-                <StatementOfAccounts />
-              </ProtectedRoute>
-            } 
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <StatementOfAccounts />
+                </ProtectedRoute>
+              </Suspense>
+            }
           />
 
           {/* Settings */}
           <Route
             path="/settings/company"
             element={
-              <ProtectedRoute>
-                <CompanySettings />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <CompanySettings />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/settings/users"
             element={
-              <ProtectedRoute>
-                <UserManagement />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <UserManagement />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/settings/units"
             element={
-              <ProtectedRoute>
-                <UnitsSettings />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <UnitsSettings />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
           <Route
             path="/settings/units/normalize"
             element={
-              <ProtectedRoute>
-                <UnitsNormalize />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <UnitsNormalize />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
 
@@ -554,42 +618,48 @@ const App = () => {
           <Route
             path="/audit-logs"
             element={
-              <ProtectedRoute>
-                <AuditLogs />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <AuditLogs />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
 
           {/* Payment Synchronization - No protection needed for setup */}
-          <Route path="/payment-sync" element={<PaymentSynchronizationPage />} />
+          <Route path="/payment-sync" element={<Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}><PaymentSynchronizationPage /></Suspense>} />
 
 
           {/* Optimized Inventory - Performance-optimized inventory page */}
           <Route
             path="/optimized-inventory"
             element={
-              <ProtectedRoute>
-                <OptimizedInventory />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <OptimizedInventory />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
 
           {/* Performance Optimizer - Database and inventory performance optimization */}
-          <Route path="/performance-optimizer" element={<PerformanceOptimizerPage />} />
+          <Route path="/performance-optimizer" element={<Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}><PerformanceOptimizerPage /></Suspense>} />
 
 
           {/* Optimized Customers - Performance-optimized customers page */}
           <Route
             path="/optimized-customers"
             element={
-              <ProtectedRoute>
-                <OptimizedCustomers />
-              </ProtectedRoute>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <OptimizedCustomers />
+                </ProtectedRoute>
+              </Suspense>
             }
           />
 
           {/* Customer Performance Optimizer - Database and customer performance optimization */}
-          <Route path="/customer-performance-optimizer" element={<CustomerPerformanceOptimizerPage />} />
+          <Route path="/customer-performance-optimizer" element={<Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}><CustomerPerformanceOptimizerPage /></Suspense>} />
 
 
 
