@@ -354,6 +354,11 @@ export function EditLCLBOQModal({
                   Section {activeSection}
                 </p>
               )}
+              {boq.id && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  editng LCL id {boq.id}
+                </p>
+              )}
             </div>
             <Button
               size="sm"
