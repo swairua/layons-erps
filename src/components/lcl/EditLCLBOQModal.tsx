@@ -146,7 +146,7 @@ export function EditLCLBOQModal({
     if (isOpen && boq.items_snapshot) {
       setItems(boq.items_snapshot);
       setInlineEdits({});
-      setSaveStatus('saved');
+      setSaveStatus(null);
       const sections = extractSections(boq.items_snapshot);
       if (sections.length > 0) {
         setActiveSection(sections[0]);
@@ -503,7 +503,7 @@ export function EditLCLBOQModal({
                       <TableCell>
                         <Input
                           type="number"
-                          value={qty}
+                          value={qty.toString()}
                           onChange={(e) => handleQtyChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"
@@ -513,7 +513,7 @@ export function EditLCLBOQModal({
                       <TableCell>
                         <Input
                           type="number"
-                          value={rate}
+                          value={rate.toString()}
                           onChange={(e) => handleRateChange(fullIndex, e.target.value)}
                           className="text-sm"
                           step="0.01"
