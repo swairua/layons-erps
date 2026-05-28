@@ -38,6 +38,8 @@ export default function FixedBOQHierarchical() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; itemId?: string }>(
     { open: false }
   );
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
   // Load structures for company
   const loadStructures = async () => {
@@ -196,6 +198,63 @@ export default function FixedBOQHierarchical() {
     setExpandedSections(newExpanded);
   };
 
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemId(itemId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemId(null);
+  };
+
+  const handleDrop = async (
+    e: React.DragEvent,
+    targetItemId: string,
+    subsectionItems: BOQFixedItemV2[],
+    sectionId: string,
+    subsectionId: string
+  ) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+
+    if (!draggedItemId || draggedItemId === targetItemId || !selectedStructure) return;
+
+    try {
+      const draggedItem = subsectionItems.find((item) => item.id === draggedItemId);
+      const targetItem = subsectionItems.find((item) => item.id === targetItemId);
+
+      if (!draggedItem || !targetItem) return;
+
+      const draggedIndex = subsectionItems.findIndex((item) => item.id === draggedItemId);
+      const targetIndex = subsectionItems.findIndex((item) => item.id === targetItemId);
+
+      const reorderedIds = [...subsectionItems.map((item) => item.id)];
+      reorderedIds.splice(draggedIndex, 1);
+      reorderedIds.splice(targetIndex, 0, draggedItemId);
+
+      await hierarchicalBOQService.reorderItemsInSubsection(
+        selectedStructure.id,
+        sectionId,
+        subsectionId,
+        reorderedIds
+      );
+
+      toast.success('Items reordered');
+      setDraggedItemId(null);
+      await loadHierarchicalData();
+    } catch (err) {
+      console.error('Reorder failed:', err);
+      toast.error('Failed to reorder items');
+      setDraggedItemId(null);
+    }
+  };
+
   if (!companyId) {
     return <div className="p-6">Please select a company first</div>;
   }
@@ -320,7 +379,21 @@ export default function FixedBOQHierarchical() {
                             </TableHeader>
                             <TableBody>
                               {subsection.items.map((item, idx) => (
-                                <TableRow key={item.id}>
+                                <TableRow
+                                  key={item.id}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, item.id)}
+                                  onDragOver={(e) => handleDragOver(e, item.id)}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={(e) =>
+                                    handleDrop(e, item.id, subsection.items, section.section_id, subsection.subsection_id)
+                                  }
+                                  className={`cursor-move transition-colors ${
+                                    draggedItemId === item.id ? 'opacity-50 bg-gray-100' : ''
+                                  } ${
+                                    dragOverItemId === item.id ? 'bg-blue-50' : ''
+                                  }`}
+                                >
                                   <TableCell>{item.item_number || idx + 1}</TableCell>
                                   <TableCell>
                                     {editingItem?.id === item.id ? (

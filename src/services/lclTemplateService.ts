@@ -129,6 +129,35 @@ export class LCLTemplateService {
     if (error) throw new Error(`Failed to delete item: ${error.message}`);
   }
 
+  async reorderItemsInSubsection(
+    structureId: string,
+    sectionId: string,
+    subsectionId: string,
+    reorderedItemIds: string[]
+  ): Promise<LCLTemplateItem[]> {
+    const items = await this.getStructureItems(structureId);
+    const subsectionItems = items.filter(
+      (item) =>
+        item.section_id === sectionId &&
+        item.subsection_id === subsectionId
+    );
+
+    const updatedItems: LCLTemplateItem[] = [];
+    for (let index = 0; index < reorderedItemIds.length; index++) {
+      const itemId = reorderedItemIds[index];
+      const item = subsectionItems.find((i) => i.id === itemId);
+      if (item) {
+        const updated = await this.updateItem(itemId, {
+          sort_order: index,
+          item_number: String(index + 1),
+        });
+        updatedItems.push(updated);
+      }
+    }
+
+    return updatedItems;
+  }
+
   async getHierarchicalData(
     structureId: string
   ): Promise<LCLHierarchicalData> {

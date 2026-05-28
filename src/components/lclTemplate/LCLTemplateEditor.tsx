@@ -60,6 +60,8 @@ export function LCLTemplateEditor({
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [loading, setLoading] = useState(false);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const { toast } = useToast();
 
@@ -354,6 +356,73 @@ export function LCLTemplateEditor({
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemId(itemId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemId(null);
+  };
+
+  const handleDrop = async (
+    e: React.DragEvent,
+    targetItemId: string,
+    subsectionItems: LCLItemWithCalculations[],
+    sectionId: string,
+    subsectionId: string
+  ) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+
+    if (!draggedItemId || draggedItemId === targetItemId) return;
+
+    try {
+      const draggedItem = subsectionItems.find((item) => item.id === draggedItemId);
+      const targetItem = subsectionItems.find((item) => item.id === targetItemId);
+
+      if (!draggedItem || !targetItem) return;
+
+      const draggedIndex = subsectionItems.findIndex((item) => item.id === draggedItemId);
+      const targetIndex = subsectionItems.findIndex((item) => item.id === targetItemId);
+
+      const reorderedIds = [...subsectionItems.map((item) => item.id)];
+      reorderedIds.splice(draggedIndex, 1);
+      reorderedIds.splice(targetIndex, 0, draggedItemId);
+
+      setLoading(true);
+      await lclTemplateService.reorderItemsInSubsection(
+        data.structure_id,
+        sectionId,
+        subsectionId,
+        reorderedIds
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Items reordered successfully.',
+      });
+      setDraggedItemId(null);
+      await onDataUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to reorder items',
+        variant: 'destructive',
+      });
+      setDraggedItemId(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const amount =
     (editingItem?.qty || 0) * (editingItem?.rate || 0);
 
@@ -462,11 +531,22 @@ export function LCLTemplateEditor({
                             {subsection.items.map((item) => (
                               <TableRow
                                 key={item.id}
-                                className={
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, item.id)}
+                                onDragOver={(e) => handleDragOver(e, item.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) =>
+                                  handleDrop(e, item.id, subsection.items, section.section_id, subsection.subsection_id)
+                                }
+                                className={`cursor-move transition-colors ${
                                   editingItem?.itemId === item.id
                                     ? 'bg-muted'
                                     : ''
-                                }
+                                } ${
+                                  draggedItemId === item.id ? 'opacity-50 bg-gray-100' : ''
+                                } ${
+                                  dragOverItemId === item.id ? 'bg-blue-50' : ''
+                                }`}
                               >
                                 <TableCell className="text-sm">
                                   {item.item_number || '-'}
