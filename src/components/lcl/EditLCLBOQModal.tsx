@@ -116,7 +116,7 @@ export function EditLCLBOQModal({
 
         subsections.push({
           subsection_id: subsectionId,
-          subsection_name: subsectionItems[0]?.description || subsectionId,
+          subsection_name: subsectionId,
           items: processedItems,
           subtotal,
         });
