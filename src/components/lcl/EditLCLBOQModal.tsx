@@ -40,7 +40,9 @@ interface InlineEdit {
 
 interface ItemSnapshot {
   section_id: string;
+  section_name?: string;
   subsection_id: string;
+  subsection_name?: string;
   item_number: string;
   description: string;
   unit: string;

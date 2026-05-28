@@ -149,7 +149,9 @@ export default function LCLTemplate() {
           subsection.items.forEach((item) => {
             itemsSnapshot.push({
               section_id: section.section_id,
+              section_name: section.section_name,
               subsection_id: subsection.subsection_id,
+              subsection_name: subsection.subsection_name,
               item_number: item.item_number,
               description: item.description,
               unit: item.unit,

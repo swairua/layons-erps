@@ -5,7 +5,9 @@ const safeN = (v: number | undefined) => (typeof v === 'number' && !isNaN(v) ? v
 
 export interface ItemSnapshot {
   section_id: string;
+  section_name?: string;
   subsection_id: string;
+  subsection_name?: string;
   item_number: string;
   description: string;
   unit: string;
@@ -143,16 +145,26 @@ export function reconstructHierarchicalDataFromSnapshot(
   sectionsMap.forEach((subsectionsMap, sectionId) => {
     const subsections: any[] = [];
     let sectionTotal = 0;
+    let preservedSectionName: string | undefined;
 
     subsectionsMap.forEach((items, subsectionId) => {
       let subtotal = 0;
+      let preservedSubsectionName: string | undefined;
 
-      const processedItems = items.map((item) => ({
-        ...item,
-        qty: safeN(item.qty),
-        rate: safeN(item.rate),
-        amount: safeN(item.qty) * safeN(item.rate),
-      }));
+      const processedItems = items.map((item) => {
+        if (!preservedSectionName && item.section_name) {
+          preservedSectionName = item.section_name;
+        }
+        if (!preservedSubsectionName && item.subsection_name) {
+          preservedSubsectionName = item.subsection_name;
+        }
+        return {
+          ...item,
+          qty: safeN(item.qty),
+          rate: safeN(item.rate),
+          amount: safeN(item.qty) * safeN(item.rate),
+        };
+      });
 
       processedItems.forEach((item) => {
         subtotal += item.amount;
@@ -160,7 +172,7 @@ export function reconstructHierarchicalDataFromSnapshot(
 
       subsections.push({
         subsection_id: subsectionId,
-        subsection_name: subsectionId,
+        subsection_name: preservedSubsectionName || subsectionId,
         items: processedItems,
         subtotal,
       });
@@ -171,7 +183,7 @@ export function reconstructHierarchicalDataFromSnapshot(
     const sectionLetter = sectionId.replace('section-', '').toUpperCase();
     sections.push({
       section_id: sectionId,
-      section_name: `SECTION ${sectionLetter}`,
+      section_name: preservedSectionName || `SECTION ${sectionLetter}`,
       subsections,
       total: sectionTotal,
     });
