@@ -292,6 +292,47 @@ class HierarchicalBOQService {
   }
 
   /**
+   * Reorder items in a subsection and update sort_order and item_number
+   */
+  async reorderItemsInSubsection(
+    structureId: string,
+    sectionId: string,
+    subsectionId: string,
+    reorderedItemIds: string[]
+  ): Promise<BOQFixedItemV2[]> {
+    const items = await this.getStructureItems(structureId);
+    const subsectionItems = items.filter(
+      (item) =>
+        item.section_id === sectionId &&
+        item.subsection_id === subsectionId
+    );
+
+    const updates: { id: string; sort_order: number; item_number: string }[] = [];
+
+    reorderedItemIds.forEach((itemId, index) => {
+      const item = subsectionItems.find((i) => i.id === itemId);
+      if (item) {
+        updates.push({
+          id: itemId,
+          sort_order: index,
+          item_number: String(index + 1),
+        });
+      }
+    });
+
+    const updatedItems: BOQFixedItemV2[] = [];
+    for (const update of updates) {
+      const updated = await this.updateItem(update.id, {
+        sort_order: update.sort_order,
+        item_number: update.item_number,
+      });
+      updatedItems.push(updated);
+    }
+
+    return updatedItems;
+  }
+
+  /**
    * Export hierarchical data for PDF generation
    */
   async exportForPDF(structureId: string): Promise<{
