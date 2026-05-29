@@ -314,31 +314,32 @@ const convertHTMLToPDFAndDownload = async (htmlContent: string, filename: string
         continue;
       }
 
-      // Get canvas data with proper DPI scaling
-      const imgData = pageCanvas.toDataURL('image/png');
-      const pageImgWidth = pageWidth; // 210mm
-      const pageImgHeight = (pageCanvas.height * pageImgWidth) / pageCanvas.width;
+      // Crop and add canvas to PDF in page-sized chunks
+      const canvasW = pageCanvas.width;
+      const canvasH = pageCanvas.height;
+      const pxPerMm = canvasW / pageWidth;
+      let yPxOffset = 0;
 
-      // Account for margins - each page should have 15mm margins on all sides
-      const marginTop = 0; // Already included in the page element's padding
-      const marginLeft = 0; // Already included in the page element's padding
-
-      let heightLeft = pageImgHeight;
-      let position = 0;
-
-      // Add image to PDF, handling multiple page-heights if needed
-      while (heightLeft > 1) { // Use > 1 instead of >= 0 to avoid blank pages
+      while (yPxOffset < canvasH) {
         if (!isFirstPage) {
           pdf.addPage();
         }
-
-        // Calculate the height to print on this PDF page
-        const heightToPrint = Math.min(pageHeight, heightLeft);
-        pdf.addImage(imgData, 'PNG', marginLeft, marginTop - position, pageImgWidth, pageImgHeight);
-
-        heightLeft -= pageHeight;
-        position += pageHeight;
         isFirstPage = false;
+
+        const capturePx = Math.min(canvasH - yPxOffset, Math.round(pageHeight * pxPerMm));
+        const captureHmm = capturePx / pxPerMm;
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvasW;
+        tempCanvas.height = capturePx;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (tempCtx) {
+          tempCtx.drawImage(pageCanvas, 0, yPxOffset, canvasW, capturePx, 0, 0, canvasW, capturePx);
+        }
+        const chunkImgData = tempCanvas.toDataURL('image/png');
+
+        pdf.addImage(chunkImgData, 'PNG', 0, 0, pageWidth, captureHmm);
+        yPxOffset += capturePx;
       }
     }
 
@@ -362,20 +363,31 @@ const convertHTMLToPDFAndDownload = async (htmlContent: string, filename: string
         throw new Error('Failed to render content to canvas - canvas is empty');
       }
 
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      const canvasW2 = canvas.width;
+      const canvasH2 = canvas.height;
+      const pxPerMm2 = canvasW2 / pageWidth;
+      let yPxOffset2 = 0;
 
-      while (heightLeft > 1) { // Use > 1 instead of >= 0 to avoid blank pages
+      while (yPxOffset2 < canvasH2) {
         if (!isFirstPage) {
           pdf.addPage();
         }
-        pdf.addImage(imgData, 'PNG', 0, -position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        position += pageHeight;
         isFirstPage = false;
+
+        const capturePx = Math.min(canvasH2 - yPxOffset2, Math.round(pageHeight * pxPerMm2));
+        const captureHmm = capturePx / pxPerMm2;
+
+        const tempCanvas2 = document.createElement('canvas');
+        tempCanvas2.width = canvasW2;
+        tempCanvas2.height = capturePx;
+        const tempCtx2 = tempCanvas2.getContext('2d');
+        if (tempCtx2) {
+          tempCtx2.drawImage(canvas, 0, yPxOffset2, canvasW2, capturePx, 0, 0, canvasW2, capturePx);
+        }
+        const chunkImgData2 = tempCanvas2.toDataURL('image/png');
+
+        pdf.addImage(chunkImgData2, 'PNG', 0, 0, pageWidth, captureHmm);
+        yPxOffset2 += capturePx;
       }
     }
 
