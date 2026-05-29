@@ -1641,70 +1641,141 @@ export const generatePDF = async (data: DocumentData) => {
         document.body.removeChild(prelim);
       }
 
-      // Render each section block separately, cropping across pages as needed
+      // Render each section block with row-aware pagination
       const sectionBlocks = sectionsContainer ? Array.from(sectionsContainer.querySelectorAll('.section-block')) : [];
 
       for (const sectionBlock of sectionBlocks) {
-        const secWrapper = document.createElement('div');
-        secWrapper.style.position = 'absolute';
-        secWrapper.style.left = '0';
-        secWrapper.style.top = '0';
-        secWrapper.style.width = '210mm';
-        secWrapper.style.height = 'auto';
-        secWrapper.style.backgroundColor = '#ffffff';
-        secWrapper.style.zIndex = '-999999';
-        secWrapper.style.pointerEvents = 'none';
-        secWrapper.innerHTML = (sectionBlock as HTMLElement).outerHTML;
-        document.body.appendChild(secWrapper);
+        const bottomPadding = 12;
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Phase 1: Clone into hidden measurer to measure row heights
+        const measurer = document.createElement('div');
+        measurer.style.position = 'absolute';
+        measurer.style.left = '-9999px';
+        measurer.style.top = '0';
+        measurer.style.width = '210mm';
+        measurer.style.backgroundColor = '#ffffff';
+        measurer.innerHTML = (sectionBlock as HTMLElement).outerHTML;
+        document.body.appendChild(measurer);
 
-        const secCanvas = await html2canvas(secWrapper, {
-          scale: 2,
-          backgroundColor: '#ffffff',
-          logging: false,
-          allowTaint: true,
-          useCORS: true,
-          imageTimeout: 15000,
-          timeout: 45000,
-          windowHeight: Math.max(secWrapper.scrollHeight, secWrapper.offsetHeight) || 1000,
-          windowWidth: 210 * 3.779527559,
-          proxy: undefined,
-          foreignObjectRendering: false
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const tableEl = measurer.querySelector('table.items');
+        if (!tableEl) {
+          document.body.removeChild(measurer);
+          // Fallback: render entire section-block as one image
+          const fbWrapper = document.createElement('div');
+          fbWrapper.style.position = 'absolute';
+          fbWrapper.style.left = '0';
+          fbWrapper.style.top = '0';
+          fbWrapper.style.width = '210mm';
+          fbWrapper.style.height = 'auto';
+          fbWrapper.style.backgroundColor = '#ffffff';
+          fbWrapper.style.zIndex = '-999999';
+          fbWrapper.style.pointerEvents = 'none';
+          fbWrapper.innerHTML = (sectionBlock as HTMLElement).outerHTML;
+          document.body.appendChild(fbWrapper);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const fbCanvas = await html2canvas(fbWrapper, {
+            scale: 2, backgroundColor: '#ffffff', logging: false, allowTaint: true, useCORS: true,
+            imageTimeout: 15000, timeout: 45000,
+            windowHeight: Math.max(fbWrapper.scrollHeight, fbWrapper.offsetHeight) || 1000,
+            windowWidth: 210 * 3.779527559, proxy: undefined, foreignObjectRendering: false
+          });
+          document.body.removeChild(fbWrapper);
+          const fbImgH = (fbCanvas.height * pageWidth) / fbCanvas.width;
+          const fbAvail = pageHeight - currentPageY - margin;
+          if (fbImgH > fbAvail && currentPageY > margin + 10) { pdf.addPage(); currentPageY = margin; }
+          pdf.addImage(fbCanvas.toDataURL('image/png'), 'PNG', 0, currentPageY, pageWidth, fbImgH);
+          currentPageY += fbImgH;
+          continue;
+        }
+
+        const theadEl = tableEl.querySelector('thead');
+        const tbodyRows = Array.from(tableEl.querySelectorAll('tbody tr'));
+        const pxPerMm = measurer.offsetWidth / 210;
+        const theadHeight = theadEl ? (theadEl as HTMLElement).offsetHeight / pxPerMm : 0;
+        const theadHtml = theadEl ? theadEl.outerHTML : '';
+
+        const rowData: { html: string; heightMm: number }[] = tbodyRows.map(row => {
+          const el = row as HTMLElement;
+          return { html: el.outerHTML, heightMm: el.offsetHeight / pxPerMm };
         });
 
-        document.body.removeChild(secWrapper);
+        const sectionBlockAttrs = Array.from((sectionBlock as HTMLElement).attributes)
+          .filter(a => a.name !== 'style')
+          .map(a => `${a.name}="${a.value.replace(/"/g, '&quot;')}"`)
+          .join(' ');
+        const sectionBlockStyle = (sectionBlock as HTMLElement).getAttribute('style') || '';
+        const tableStyleStr = (sectionBlock as HTMLElement).querySelector('table.items')?.getAttribute('style') || '';
 
-        const canvasW = secCanvas.width;
-        const canvasH = secCanvas.height;
-        const pxPerMm = canvasW / pageWidth;
-        let yPxOffset = 0;
+        document.body.removeChild(measurer);
 
-        while (yPxOffset < canvasH) {
-          const availPageHmm = pageHeight - currentPageY - margin;
-          if (availPageHmm < 5) {
+        // Phase 2: Build page slices from complete rows
+        let rowIndex = 0;
+
+        while (rowIndex < rowData.length) {
+          const availHeight = pageHeight - currentPageY - margin - bottomPadding;
+          if (availHeight < 10) {
             pdf.addPage();
             currentPageY = margin;
             continue;
           }
-          const availPagePx = Math.round(availPageHmm * pxPerMm);
-          const capturePx = Math.min(canvasH - yPxOffset, availPagePx);
-          const captureHmm = capturePx / pxPerMm;
 
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvasW;
-          tempCanvas.height = capturePx;
-          const tempCtx = tempCanvas.getContext('2d');
-          if (tempCtx) {
-            tempCtx.drawImage(secCanvas, 0, yPxOffset, canvasW, capturePx, 0, 0, canvasW, capturePx);
+          const pageRows: typeof rowData = [];
+          let usedHeight = theadHeight;
+
+          while (rowIndex < rowData.length) {
+            const h = rowData[rowIndex].heightMm;
+            if (usedHeight + h > availHeight && pageRows.length > 0) {
+              break;
+            }
+            pageRows.push(rowData[rowIndex]);
+            usedHeight += h;
+            rowIndex++;
           }
-          const chunkImgData = tempCanvas.toDataURL('image/png');
 
-          pdf.addImage(chunkImgData, 'PNG', 0, currentPageY, pageWidth, captureHmm);
-          currentPageY += captureHmm;
-          yPxOffset += capturePx;
+          if (pageRows.length === 0 && rowIndex < rowData.length) {
+            pageRows.push(rowData[rowIndex]);
+            rowIndex++;
+          }
 
-          if (yPxOffset < canvasH) {
+          const sliceHtml = `<div ${sectionBlockAttrs} style="${sectionBlockStyle}">
+            <table class="items" style="${tableStyleStr}">
+              ${theadHtml}
+              <tbody>
+                ${pageRows.map(r => r.html).join('')}
+              </tbody>
+            </table>
+          </div>`;
+
+          const sliceWrapper = document.createElement('div');
+          sliceWrapper.style.position = 'absolute';
+          sliceWrapper.style.left = '0';
+          sliceWrapper.style.top = '0';
+          sliceWrapper.style.width = '210mm';
+          sliceWrapper.style.height = 'auto';
+          sliceWrapper.style.backgroundColor = '#ffffff';
+          sliceWrapper.style.zIndex = '-999999';
+          sliceWrapper.style.pointerEvents = 'none';
+          sliceWrapper.innerHTML = sliceHtml;
+          document.body.appendChild(sliceWrapper);
+
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const sliceCanvas = await html2canvas(sliceWrapper, {
+            scale: 2, backgroundColor: '#ffffff', logging: false, allowTaint: true, useCORS: true,
+            imageTimeout: 15000, timeout: 45000,
+            windowHeight: Math.max(sliceWrapper.scrollHeight, sliceWrapper.offsetHeight) || 1000,
+            windowWidth: 210 * 3.779527559, proxy: undefined, foreignObjectRendering: false
+          });
+
+          document.body.removeChild(sliceWrapper);
+
+          const imgHmm = (sliceCanvas.height * pageWidth) / sliceCanvas.width;
+          pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, currentPageY, pageWidth, imgHmm);
+          currentPageY += imgHmm;
+
+          if (rowIndex < rowData.length) {
             pdf.addPage();
             currentPageY = margin;
           }
