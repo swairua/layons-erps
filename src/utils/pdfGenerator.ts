@@ -1629,7 +1629,7 @@ export const generatePDF = async (data: DocumentData) => {
         document.body.removeChild(prelim);
       }
 
-      // Render each section block separately
+      // Render each section block separately, cropping across pages as needed
       const sectionBlocks = sectionsContainer ? Array.from(sectionsContainer.querySelectorAll('.section-block')) : [];
 
       for (const sectionBlock of sectionBlocks) {
@@ -1661,20 +1661,42 @@ export const generatePDF = async (data: DocumentData) => {
           foreignObjectRendering: false
         });
 
-        const secImgData = secCanvas.toDataURL('image/png');
-        const secImgWidth = pageWidth;
-        const secImgHeight = (secCanvas.height * secImgWidth) / secCanvas.width;
-
-        const secAvailHeight = pageHeight - currentPageY - margin;
-        if (secImgHeight > secAvailHeight && currentPageY > margin + 10) {
-          pdf.addPage();
-          currentPageY = margin;
-        }
-
-        pdf.addImage(secImgData, 'PNG', 0, currentPageY, secImgWidth, secImgHeight);
-        currentPageY += secImgHeight;
-
         document.body.removeChild(secWrapper);
+
+        const canvasW = secCanvas.width;
+        const canvasH = secCanvas.height;
+        const pxPerMm = canvasW / pageWidth;
+        let yPxOffset = 0;
+
+        while (yPxOffset < canvasH) {
+          const availPageHmm = pageHeight - currentPageY - margin;
+          if (availPageHmm < 5) {
+            pdf.addPage();
+            currentPageY = margin;
+            continue;
+          }
+          const availPagePx = Math.round(availPageHmm * pxPerMm);
+          const capturePx = Math.min(canvasH - yPxOffset, availPagePx);
+          const captureHmm = capturePx / pxPerMm;
+
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvasW;
+          tempCanvas.height = capturePx;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            tempCtx.drawImage(secCanvas, 0, yPxOffset, canvasW, capturePx, 0, 0, canvasW, capturePx);
+          }
+          const chunkImgData = tempCanvas.toDataURL('image/png');
+
+          pdf.addImage(chunkImgData, 'PNG', 0, currentPageY, pageWidth, captureHmm);
+          currentPageY += captureHmm;
+          yPxOffset += capturePx;
+
+          if (yPxOffset < canvasH) {
+            pdf.addPage();
+            currentPageY = margin;
+          }
+        }
       }
 
       // Render totals section
