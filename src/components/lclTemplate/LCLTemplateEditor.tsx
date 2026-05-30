@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Trash2, Check, X, Edit2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Check, X, Edit2, Trash } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -25,6 +25,12 @@ import {
   LCLTemplateItem,
 } from '@/types/lclTemplate';
 import { LCL_TEMPLATE_UNITS } from '@/utils/lclTemplateUnits';
+import {
+  saveDraftToLocalStorage,
+  loadDraftFromLocalStorage,
+  clearDraftFromLocalStorage,
+} from '@/utils/lclTemplateAutosaveUtils';
+import { LCLTemplateSaveIndicator } from './LCLTemplateSaveIndicator';
 
 interface LCLTemplateEditorProps {
   data: LCLHierarchicalData;
@@ -62,8 +68,19 @@ export function LCLTemplateEditor({
   const [loading, setLoading] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+
+  // Format number to remove unnecessary decimals (1.00 → 1, 1.50 → 1.5)
+  const formatNumber = (value: number): string => {
+    if (typeof value !== 'number') return '0';
+    const formatted = value.toLocaleString('en-KE', { maximumFractionDigits: 2 });
+    return formatted.replace(/\.?0+$/, '');
+  };
 
   // Calculate item amount with inline edits
   const getItemAmount = (item: LCLItemWithCalculations): number => {
@@ -191,38 +208,48 @@ export function LCLTemplateEditor({
     const qty = parseFloat(value) || 0;
     if (qty < 0) return;
 
-    setInlineEdits((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], qty },
-    }));
+    setInlineEdits((prev) => {
+      const newEdits = {
+        ...prev,
+        [itemId]: { ...prev[itemId], qty },
+      };
 
-    // Debounce save
-    if (debounceTimers.current[itemId]) {
-      clearTimeout(debounceTimers.current[itemId]);
-    }
+      // Debounce save - capture current rate value when timer executes
+      if (debounceTimers.current[itemId]) {
+        clearTimeout(debounceTimers.current[itemId]);
+      }
 
-    debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemId, qty, inlineEdits[itemId]?.rate);
-    }, 500);
+      debounceTimers.current[itemId] = setTimeout(() => {
+        const currentRate = newEdits[itemId]?.rate;
+        saveInlineEdit(itemId, qty, currentRate);
+      }, 500);
+
+      return newEdits;
+    });
   };
 
   const handleInlineRateChange = (itemId: string, value: string) => {
     const rate = parseFloat(value) || 0;
     if (rate < 0) return;
 
-    setInlineEdits((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], rate },
-    }));
+    setInlineEdits((prev) => {
+      const newEdits = {
+        ...prev,
+        [itemId]: { ...prev[itemId], rate },
+      };
 
-    // Debounce save
-    if (debounceTimers.current[itemId]) {
-      clearTimeout(debounceTimers.current[itemId]);
-    }
+      // Debounce save - capture current qty value when timer executes
+      if (debounceTimers.current[itemId]) {
+        clearTimeout(debounceTimers.current[itemId]);
+      }
 
-    debounceTimers.current[itemId] = setTimeout(() => {
-      saveInlineEdit(itemId, inlineEdits[itemId]?.qty, rate);
-    }, 500);
+      debounceTimers.current[itemId] = setTimeout(() => {
+        const currentQty = newEdits[itemId]?.qty;
+        saveInlineEdit(itemId, currentQty, rate);
+      }, 500);
+
+      return newEdits;
+    });
   };
 
   const saveInlineEdit = async (itemId: string, newQty?: number, newRate?: number) => {
@@ -257,6 +284,12 @@ export function LCLTemplateEditor({
       setInlineEdits((prev) => {
         const updated = { ...prev };
         delete updated[itemId];
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
         return updated;
       });
 
@@ -271,10 +304,54 @@ export function LCLTemplateEditor({
     }
   };
 
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const draft = loadDraftFromLocalStorage(data.structure_id);
+    if (draft && Object.keys(draft).length > 0) {
+      setInlineEdits(draft);
+      setHasUnsavedChanges(true);
+      toast({
+        title: 'Draft Restored',
+        description: 'Your unsaved changes have been restored.',
+      });
+    }
+  }, [data.structure_id, toast]);
+
+  // Autosave inline edits every 5 seconds
+  useEffect(() => {
+    if (Object.keys(inlineEdits).length === 0) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      setIsSaving(true);
+      try {
+        saveDraftToLocalStorage(data.structure_id, inlineEdits);
+        setLastSavedTime(new Date().toISOString());
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('Failed to autosave draft:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 5000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [inlineEdits, data.structure_id]);
+
   // Cleanup debounce timers on unmount
   useEffect(() => {
     return () => {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
     };
   }, []);
 
@@ -425,12 +502,75 @@ export function LCLTemplateEditor({
         title: 'Success',
         description: 'Item deleted successfully.',
       });
+
+      // Remove from inline edits if present
+      setInlineEdits((prev) => {
+        const updated = { ...prev };
+        delete updated[itemId];
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
+        return updated;
+      });
+
       await onDataUpdated();
     } catch (error) {
       toast({
         title: 'Error',
         description:
           error instanceof Error ? error.message : 'Failed to delete item',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string, sectionName: string) => {
+    if (!window.confirm(`Remove "${sectionName}" from this BOQ? The template remains unchanged.`)) return;
+
+    setLoading(true);
+    try {
+      const section = data.sections.find((s) => s.section_id === sectionId);
+      if (!section) return;
+
+      for (const subsection of section.subsections) {
+        for (const item of subsection.items) {
+          await lclTemplateService.deleteItem(item.id);
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Section removed successfully.',
+      });
+
+      // Clear inline edits for deleted items
+      setInlineEdits((prev) => {
+        const updated = { ...prev };
+        section.subsections.forEach((subsection) => {
+          subsection.items.forEach((item) => {
+            delete updated[item.id];
+          });
+        });
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
+        return updated;
+      });
+
+      await onDataUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to delete section',
         variant: 'destructive',
       });
     } finally {
@@ -512,7 +652,14 @@ export function LCLTemplateEditor({
     <div className="space-y-6">
       {/* Summary header */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <h2 className="text-lg font-semibold mb-2">{data.structure_name}</h2>
+        <div className="flex items-start justify-between mb-2">
+          <h2 className="text-lg font-semibold">{data.structure_name}</h2>
+          <LCLTemplateSaveIndicator
+            isSaving={isSaving}
+            hasUnsavedChanges={hasUnsavedChanges}
+            lastSavedTime={lastSavedTime}
+          />
+        </div>
         {data.description && (
           <p className="text-sm text-muted-foreground mb-3">
             {data.description}
@@ -522,7 +669,7 @@ export function LCLTemplateEditor({
           <p className="text-sm font-medium">
             Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              Ksh{getGrandTotal().toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+              Ksh{formatNumber(getGrandTotal())}
             </span>
           </p>
         </div>
@@ -533,39 +680,51 @@ export function LCLTemplateEditor({
         {data.sections.map((section) => (
           <div key={section.section_id} className="border border-border rounded-lg">
             {/* Section header */}
-            <button
-              onClick={() => toggleSection(section.section_id)}
-              className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                {expandedSections.has(section.section_id) ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                <h3 className="font-semibold">{section.section_name}</h3>
-                {(() => {
-                  const inheritanceMap: { [key: string]: string } = {
-                    'section_d': 'section_b',
-                    'section_e': 'section_c',
-                    'section_f': 'section_b',
-                    'section_g': 'section_c'
-                  };
-                  const parentSectionId = inheritanceMap[section.section_id];
-                  const parentName = parentSectionId ?
-                    data.sections.find(s => s.section_id === parentSectionId)?.section_name :
-                    null;
-                  return parentName ? (
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      Inherits from {parentName}
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-              <p className="text-sm font-medium">
-                Section Total (KES): Ksh{totals[section.section_id]?.section.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
-              </p>
-            </button>
+            <div className="flex items-center justify-between p-4 hover:bg-muted transition-colors border-b border-border">
+              <button
+                onClick={() => toggleSection(section.section_id)}
+                className="flex-1 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  {expandedSections.has(section.section_id) ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <h3 className="font-semibold">{section.section_name}</h3>
+                  {(() => {
+                    const inheritanceMap: { [key: string]: string } = {
+                      'section_d': 'section_b',
+                      'section_e': 'section_c',
+                      'section_f': 'section_b',
+                      'section_g': 'section_c'
+                    };
+                    const parentSectionId = inheritanceMap[section.section_id];
+                    const parentName = parentSectionId ?
+                      data.sections.find(s => s.section_id === parentSectionId)?.section_name :
+                      null;
+                    return parentName ? (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Inherits from {parentName}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
+                <p className="text-sm font-medium">
+                  Section Total (KES): Ksh{formatNumber(totals[section.section_id]?.section || 0)}
+                </p>
+              </button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleDeleteSection(section.section_id, section.section_name)}
+                disabled={loading}
+                className="h-8 w-8 p-0 ml-2"
+                title="Remove section from BOQ"
+              >
+                <Trash className="h-4 w-4 text-red-600" />
+              </Button>
+            </div>
 
             {/* Subsections and items */}
             {expandedSections.has(section.section_id) && (
@@ -594,7 +753,7 @@ export function LCLTemplateEditor({
                         </p>
                       </div>
                       <p className="text-sm">
-                        Subtotal (KES): Ksh{totals[section.section_id]?.subsections[subsection.subsection_id]?.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                        Subtotal (KES): Ksh{formatNumber(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
                       </p>
                     </button>
 
@@ -701,7 +860,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.qty}
+                                      value={editingItem.qty || ''}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -715,7 +874,7 @@ export function LCLTemplateEditor({
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : item.default_qty || 0}
+                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty || '' : (item.default_qty || '') }
                                       onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
                                       disabled={loading}
                                       className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
@@ -727,7 +886,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.rate}
+                                      value={editingItem.rate || ''}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -741,7 +900,7 @@ export function LCLTemplateEditor({
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : item.default_rate || 0}
+                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate || '' : (item.default_rate || '')}
                                       onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
                                       disabled={loading}
                                       className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
@@ -751,10 +910,8 @@ export function LCLTemplateEditor({
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-semibold">
                                   {editingItem?.itemId === item.id
-                                    ? amount.toLocaleString('en-KE', { maximumFractionDigits: 2 })
-                                    : getItemAmount(item).toLocaleString('en-KE', {
-                                        maximumFractionDigits: 2,
-                                      })}
+                                    ? formatNumber(amount)
+                                    : formatNumber(getItemAmount(item))}
                                 </TableCell>
                                 <TableCell>
                                   {editingItem?.itemId === item.id ? (
@@ -810,7 +967,7 @@ export function LCLTemplateEditor({
                             <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default font-semibold">
                               <TableCell colSpan={5} className="text-sm py-2"></TableCell>
                               <TableCell className="text-right text-sm font-semibold py-2">
-                                Ksh{(totals[section.section_id]?.subsections[subsection.subsection_id] || 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                                Ksh{formatNumber(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
                               </TableCell>
                               <TableCell></TableCell>
                             </TableRow>
@@ -892,7 +1049,7 @@ export function LCLTemplateEditor({
                                   />
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-semibold">
-                                  {amount.toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                                  {formatNumber(amount)}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
