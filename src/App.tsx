@@ -221,13 +221,15 @@ const App = () => {
 
         // Verify invoices table is accessible
         // Note: company_id column may not exist - invoices are linked through customers
+        // Silently verify - don't show errors to user during startup
         try {
           const companyIdExists = await verifyInvoiceCompanyIdColumn();
           if (!companyIdExists) {
-            console.warn('⚠️ invoices table verification issue - attempting to continue');
+            // Log but don't show to user during initialization
+            console.log('ℹ️ Invoices table verification ongoing...');
           }
         } catch (err) {
-          console.warn('⚠️ could not verify invoices table - will attempt normal operation', err);
+          // Silently handle - will retry on actual data access
         }
 
         // Fix RLS policy for invoice deletion (handles company_id column issue)

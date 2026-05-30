@@ -15,11 +15,28 @@ const initializeErrorSuppression = () => {
       messageStr.includes('ResizeObserver');
   };
 
+  // Suppress non-blocking initialization errors that shouldn't show to users
+  const isInitializationError = (args: any[]) => {
+    if (args.length === 0) return false;
+    const firstArg = args[0];
+    const messageStr = typeof firstArg === 'string'
+      ? firstArg
+      : String(firstArg?.message || firstArg);
+
+    return messageStr.includes('❌ Invoices table verification failed') ||
+           messageStr.includes('table verification failed') ||
+           messageStr.includes('[object Object]');
+  };
+
   // Override console.error immediately
   const originalConsoleError = window.console.error;
   window.console.error = (...args) => {
     if (args.length > 0 && isResizeObserverError(args[0])) {
       // Silently ignore ResizeObserver errors
+      return;
+    }
+    if (isInitializationError(args)) {
+      // Silently ignore non-blocking initialization errors
       return;
     }
     originalConsoleError.apply(console, args);

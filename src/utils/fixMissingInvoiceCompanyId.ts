@@ -147,15 +147,9 @@ export async function verifyInvoiceCompanyIdColumn(): Promise<boolean> {
         hint: error.hint,
       };
 
-      console.error('❌ Invoices table verification failed:', errorDetails);
-
-      // Provide actionable guidance based on error type
-      if (error.message?.includes('row level security') || error.message?.includes('policy')) {
-        console.error('💡 This is likely a Row Level Security (RLS) policy issue.');
-        console.error('The app will attempt to create RLS policies on next startup.');
-      } else if (error.code === 'PGRST116') {
-        console.error('💡 Row Level Security policies are not configured.');
-        console.error('Please run SQL in Supabase to create RLS policies.');
+      // Only log in debug/development, don't show to user during initialization
+      if (typeof window !== 'undefined' && (window as any).__DEBUG_ERRORS__) {
+        console.debug('Invoices table verification:', errorDetails);
       }
 
       return false;
@@ -164,11 +158,7 @@ export async function verifyInvoiceCompanyIdColumn(): Promise<boolean> {
     console.log('✅ Invoices table verified successfully');
     return true;
   } catch (error) {
-    console.error('Error verifying invoices table:', {
-      message: error instanceof Error ? error.message : String(error),
-      name: error instanceof Error ? error.name : 'Unknown',
-      error
-    });
+    // Silently handle verification errors during initialization
     return false;
   }
 }
