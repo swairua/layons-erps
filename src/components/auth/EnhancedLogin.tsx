@@ -79,7 +79,10 @@ export function EnhancedLogin() {
         }
       }
 
-      console.error('Unexpected sign in error:', unexpectedError);
+      console.error('Unexpected sign in error:', {
+        message: unexpectedError instanceof Error ? unexpectedError.message : String(unexpectedError),
+        error: unexpectedError
+      });
       toast.error(errorMessage || 'An unexpected error occurred. Please try again.');
     } finally {
       setSubmitting(false);

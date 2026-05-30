@@ -377,7 +377,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         completeInit();
       } catch (error) {
-        console.error('❌ Initialization error:', error);
+        console.error('❌ Initialization error:', {
+          message: error instanceof Error ? error.message : String(error),
+          error
+        });
         completeInit();
       }
     };
@@ -517,7 +520,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setLoading(false);
       }
     } catch (error) {
-      console.error('❌ Unexpected error in signIn:', error);
+      console.error('❌ Unexpected error in signIn:', {
+        message: error instanceof Error ? error.message : String(error),
+        error
+      });
       setLoading(false);
     }
     setTimeout(() => toast.success('Signed in successfully'), 0);
@@ -787,7 +793,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       logError('Error changing user password exception:', error, { context: 'changeUserPassword', targetUserId: userId });
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      console.error('💥 Unexpected error:', errorMessage);
+      console.error('💥 Unexpected error:', {
+        message: errorMessage,
+        error
+      });
       setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
       return { error: error as Error };
     }

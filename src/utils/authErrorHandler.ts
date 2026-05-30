@@ -184,8 +184,19 @@ export function analyzeAuthError(error: AuthError | Error): AuthErrorInfo {
 export function handleAuthError(error: AuthError | Error): AuthErrorInfo {
   const errorInfo = analyzeAuthError(error);
 
-  // Log for debugging using structured logger
-  logError('Authentication error', error, { parsed: errorInfo });
+  // Log for debugging using structured logger with detailed error info
+  logError('Authentication error', error, {
+    parsed: errorInfo,
+    errorDetails: {
+      message: error?.message || 'No message',
+      code: (error as any)?.code,
+      status: (error as any)?.status,
+      statusCode: (error as any)?.statusCode,
+      details: (error as any)?.details,
+      hint: (error as any)?.hint,
+      originalError: String(error)
+    }
+  });
 
   // Triple-check that message is definitely a string
   let messageToShow = 'An unexpected authentication error occurred';
