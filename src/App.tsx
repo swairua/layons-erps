@@ -13,6 +13,7 @@ import { verifyInvoiceRLSFix } from "@/utils/fixInvoiceRLSPolicy";
 import { verifyRLSDisabled } from "@/utils/disableInvoiceRLS";
 import { fixRLSWithProperOrder, verifyRLSColumnFix } from "@/utils/fixRLSProperOrder";
 import { fixQuotationsRLS, verifyQuotationsRLS } from "@/utils/fixQuotationsRLS";
+import { ensureRLSPolicies } from "@/utils/ensureRLSPolicies";
 
 // Lazy load the page components to reduce initial bundle size and startup time
 import { lazy, Suspense } from "react";
@@ -203,6 +204,19 @@ const App = () => {
           console.error('OR use the ManualSQLSetup page at /setup-test');
         } else {
           console.log('✅ RLS check passed - database is accessible');
+        }
+
+        // First, ensure RLS policies exist so we can access tables
+        try {
+          console.log('📋 Ensuring database policies are configured...');
+          const policyResult = await ensureRLSPolicies();
+          if (!policyResult.success) {
+            console.warn('⚠️ Could not ensure RLS policies:', policyResult.message);
+          } else {
+            console.log('✅ RLS policies are configured');
+          }
+        } catch (err) {
+          console.warn('⚠️ Error ensuring RLS policies:', err);
         }
 
         // Verify invoices table is accessible
