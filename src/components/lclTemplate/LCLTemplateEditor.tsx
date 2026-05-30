@@ -73,6 +73,7 @@ export function LCLTemplateEditor({
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const latestInlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const { toast } = useToast();
 
   // Format number to remove unnecessary decimals (1.00 → 1, 1.50 → 1.5)
@@ -214,14 +215,24 @@ export function LCLTemplateEditor({
         [itemId]: { ...prev[itemId], qty },
       };
 
-      // Debounce save - capture current rate value when timer executes
+      // Save first edit to localStorage immediately for recovery
+      if (Object.keys(prev).length === 0) {
+        try {
+          saveDraftToLocalStorage(data.structure_id, newEdits);
+        } catch (error) {
+          console.error('Failed to save first edit:', error);
+        }
+      }
+
+      // Debounce save - read both qty and rate from latest ref when timer executes
       if (debounceTimers.current[itemId]) {
         clearTimeout(debounceTimers.current[itemId]);
       }
 
       debounceTimers.current[itemId] = setTimeout(() => {
-        const currentRate = newEdits[itemId]?.rate;
-        saveInlineEdit(itemId, qty, currentRate);
+        const latestQty = latestInlineEditsRef.current[itemId]?.qty ?? qty;
+        const latestRate = latestInlineEditsRef.current[itemId]?.rate;
+        saveInlineEdit(itemId, latestQty, latestRate);
       }, 500);
 
       return newEdits;
@@ -238,14 +249,24 @@ export function LCLTemplateEditor({
         [itemId]: { ...prev[itemId], rate },
       };
 
-      // Debounce save - capture current qty value when timer executes
+      // Save first edit to localStorage immediately for recovery
+      if (Object.keys(prev).length === 0) {
+        try {
+          saveDraftToLocalStorage(data.structure_id, newEdits);
+        } catch (error) {
+          console.error('Failed to save first edit:', error);
+        }
+      }
+
+      // Debounce save - read both qty and rate from latest ref when timer executes
       if (debounceTimers.current[itemId]) {
         clearTimeout(debounceTimers.current[itemId]);
       }
 
       debounceTimers.current[itemId] = setTimeout(() => {
-        const currentQty = newEdits[itemId]?.qty;
-        saveInlineEdit(itemId, currentQty, rate);
+        const latestQty = latestInlineEditsRef.current[itemId]?.qty;
+        const latestRate = latestInlineEditsRef.current[itemId]?.rate ?? rate;
+        saveInlineEdit(itemId, latestQty, latestRate);
       }, 500);
 
       return newEdits;
@@ -303,6 +324,18 @@ export function LCLTemplateEditor({
       });
     }
   };
+
+  // Keep latest edits ref in sync with state for debounce callbacks
+  useEffect(() => {
+    latestInlineEditsRef.current = inlineEdits;
+  }, [inlineEdits]);
+
+  // Mark as unsaved when user makes new edits (after mount/load)
+  useEffect(() => {
+    if (Object.keys(inlineEdits).length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [inlineEdits]);
 
   // Load draft from localStorage on mount
   useEffect(() => {
