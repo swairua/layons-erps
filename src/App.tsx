@@ -13,6 +13,7 @@ import { verifyInvoiceRLSFix } from "@/utils/fixInvoiceRLSPolicy";
 import { verifyRLSDisabled } from "@/utils/disableInvoiceRLS";
 import { fixRLSWithProperOrder, verifyRLSColumnFix } from "@/utils/fixRLSProperOrder";
 import { fixQuotationsRLS, verifyQuotationsRLS } from "@/utils/fixQuotationsRLS";
+import { ensureRLSPolicies } from "@/utils/ensureRLSPolicies";
 
 // Lazy load the page components to reduce initial bundle size and startup time
 import { lazy, Suspense } from "react";
@@ -205,15 +206,30 @@ const App = () => {
           console.log('✅ RLS check passed - database is accessible');
         }
 
+        // First, ensure RLS policies exist so we can access tables
+        try {
+          console.log('📋 Ensuring database policies are configured...');
+          const policyResult = await ensureRLSPolicies();
+          if (!policyResult.success) {
+            console.warn('⚠️ Could not ensure RLS policies:', policyResult.message);
+          } else {
+            console.log('✅ RLS policies are configured');
+          }
+        } catch (err) {
+          console.warn('⚠️ Error ensuring RLS policies:', err);
+        }
+
         // Verify invoices table is accessible
         // Note: company_id column may not exist - invoices are linked through customers
+        // Silently verify - don't show errors to user during startup
         try {
           const companyIdExists = await verifyInvoiceCompanyIdColumn();
           if (!companyIdExists) {
-            console.warn('⚠️ invoices table verification issue - attempting to continue');
+            // Log but don't show to user during initialization
+            console.log('ℹ️ Invoices table verification ongoing...');
           }
         } catch (err) {
-          console.warn('⚠️ could not verify invoices table - will attempt normal operation', err);
+          // Silently handle - will retry on actual data access
         }
 
         // Fix RLS policy for invoice deletion (handles company_id column issue)

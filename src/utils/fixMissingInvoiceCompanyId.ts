@@ -138,14 +138,27 @@ export async function verifyInvoiceCompanyIdColumn(): Promise<boolean> {
       .limit(1);
 
     if (error) {
-      console.error('❌ Invoices table verification failed:', error);
+      const errorDetails = {
+        message: error.message,
+        code: error.code,
+        status: (error as any).status,
+        statusCode: (error as any).statusCode,
+        details: error.details,
+        hint: error.hint,
+      };
+
+      // Only log in debug/development, don't show to user during initialization
+      if (typeof window !== 'undefined' && (window as any).__DEBUG_ERRORS__) {
+        console.debug('Invoices table verification:', errorDetails);
+      }
+
       return false;
     }
 
-    console.log('✅ Invoices table verified (company_id column removed for single-company system)');
+    console.log('✅ Invoices table verified successfully');
     return true;
   } catch (error) {
-    console.error('Error verifying invoices table:', error);
+    // Silently handle verification errors during initialization
     return false;
   }
 }

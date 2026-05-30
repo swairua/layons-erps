@@ -178,7 +178,10 @@ export async function verifyRLSColumnFix(): Promise<boolean> {
     console.log('✅ RLS column verified - company_id column exists');
     return true;
   } catch (error) {
-    console.error('Error verifying RLS column fix:', error);
+    console.error('Error verifying RLS column fix:', {
+      message: error instanceof Error ? error.message : String(error),
+      error
+    });
     return false;
   }
 }

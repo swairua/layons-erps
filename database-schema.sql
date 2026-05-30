@@ -379,6 +379,72 @@ ALTER TABLE remittance_advice ENABLE ROW LEVEL SECURITY;
 ALTER TABLE remittance_advice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
 
+-- RLS Policies for authenticated users
+-- Allow authenticated users to access invoices
+CREATE POLICY "invoices_authenticated_access" ON invoices
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access invoice_items
+CREATE POLICY "invoice_items_authenticated_access" ON invoice_items
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access quotations
+CREATE POLICY "quotations_authenticated_access" ON quotations
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access quotation_items
+CREATE POLICY "quotation_items_authenticated_access" ON quotation_items
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access proforma_invoices
+CREATE POLICY "proforma_invoices_authenticated_access" ON proforma_invoices
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access proforma_items
+CREATE POLICY "proforma_items_authenticated_access" ON proforma_items
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access delivery_notes
+CREATE POLICY "delivery_notes_authenticated_access" ON delivery_notes
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access delivery_note_items
+CREATE POLICY "delivery_note_items_authenticated_access" ON delivery_note_items
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access payments
+CREATE POLICY "payments_authenticated_access" ON payments
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access payment_allocations
+CREATE POLICY "payment_allocations_authenticated_access" ON payment_allocations
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access remittance_advice
+CREATE POLICY "remittance_advice_authenticated_access" ON remittance_advice
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access remittance_advice_items
+CREATE POLICY "remittance_advice_items_authenticated_access" ON remittance_advice_items
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow authenticated users to access stock_movements
+CREATE POLICY "stock_movements_authenticated_access" ON stock_movements
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
 -- Sample data for MedPlus Africa
 INSERT INTO companies (id, name, registration_number, tax_number, email, phone, address, city, country, logo_url) 
 VALUES (

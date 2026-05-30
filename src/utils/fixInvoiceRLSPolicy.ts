@@ -105,7 +105,10 @@ export async function verifyInvoiceRLSFix(): Promise<boolean> {
     console.log('✅ Invoice RLS policy is working correctly');
     return true;
   } catch (error) {
-    console.error('Error verifying RLS fix:', error);
+    console.error('Error verifying RLS fix:', {
+      message: error instanceof Error ? error.message : String(error),
+      error
+    });
     return false;
   }
 }

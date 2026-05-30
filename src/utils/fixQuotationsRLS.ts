@@ -153,7 +153,10 @@ export async function verifyQuotationsRLS(): Promise<boolean> {
     console.log('✅ Quotations RLS verified successfully');
     return true;
   } catch (error) {
-    console.error('Error verifying quotations RLS:', error);
+    console.error('Error verifying quotations RLS:', {
+      message: error instanceof Error ? error.message : String(error),
+      error
+    });
     return false;
   }
 }
