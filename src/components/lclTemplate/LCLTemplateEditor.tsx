@@ -25,6 +25,12 @@ import {
   LCLTemplateItem,
 } from '@/types/lclTemplate';
 import { LCL_TEMPLATE_UNITS } from '@/utils/lclTemplateUnits';
+import {
+  saveDraftToLocalStorage,
+  loadDraftFromLocalStorage,
+  clearDraftFromLocalStorage,
+} from '@/utils/lclTemplateAutosaveUtils';
+import { LCLTemplateSaveIndicator } from './LCLTemplateSaveIndicator';
 
 interface LCLTemplateEditorProps {
   data: LCLHierarchicalData;
@@ -62,7 +68,11 @@ export function LCLTemplateEditor({
   const [loading, setLoading] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   // Format number to remove unnecessary decimals (1.00 → 1, 1.50 → 1.5)
@@ -274,6 +284,12 @@ export function LCLTemplateEditor({
       setInlineEdits((prev) => {
         const updated = { ...prev };
         delete updated[itemId];
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
         return updated;
       });
 
@@ -288,10 +304,54 @@ export function LCLTemplateEditor({
     }
   };
 
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const draft = loadDraftFromLocalStorage(data.structure_id);
+    if (draft && Object.keys(draft).length > 0) {
+      setInlineEdits(draft);
+      setHasUnsavedChanges(true);
+      toast({
+        title: 'Draft Restored',
+        description: 'Your unsaved changes have been restored.',
+      });
+    }
+  }, [data.structure_id, toast]);
+
+  // Autosave inline edits every 5 seconds
+  useEffect(() => {
+    if (Object.keys(inlineEdits).length === 0) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      setIsSaving(true);
+      try {
+        saveDraftToLocalStorage(data.structure_id, inlineEdits);
+        setLastSavedTime(new Date().toISOString());
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('Failed to autosave draft:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 5000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [inlineEdits, data.structure_id]);
+
   // Cleanup debounce timers on unmount
   useEffect(() => {
     return () => {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
     };
   }, []);
 
@@ -442,6 +502,20 @@ export function LCLTemplateEditor({
         title: 'Success',
         description: 'Item deleted successfully.',
       });
+
+      // Remove from inline edits if present
+      setInlineEdits((prev) => {
+        const updated = { ...prev };
+        delete updated[itemId];
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
+        return updated;
+      });
+
       await onDataUpdated();
     } catch (error) {
       toast({
@@ -473,6 +547,24 @@ export function LCLTemplateEditor({
         title: 'Success',
         description: 'Section removed successfully.',
       });
+
+      // Clear inline edits for deleted items
+      setInlineEdits((prev) => {
+        const updated = { ...prev };
+        section.subsections.forEach((subsection) => {
+          subsection.items.forEach((item) => {
+            delete updated[item.id];
+          });
+        });
+
+        // Clear draft if no more unsaved edits
+        if (Object.keys(updated).length === 0) {
+          clearDraftFromLocalStorage(data.structure_id);
+        }
+
+        return updated;
+      });
+
       await onDataUpdated();
     } catch (error) {
       toast({
@@ -560,7 +652,14 @@ export function LCLTemplateEditor({
     <div className="space-y-6">
       {/* Summary header */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <h2 className="text-lg font-semibold mb-2">{data.structure_name}</h2>
+        <div className="flex items-start justify-between mb-2">
+          <h2 className="text-lg font-semibold">{data.structure_name}</h2>
+          <LCLTemplateSaveIndicator
+            isSaving={isSaving}
+            hasUnsavedChanges={hasUnsavedChanges}
+            lastSavedTime={lastSavedTime}
+          />
+        </div>
         {data.description && (
           <p className="text-sm text-muted-foreground mb-3">
             {data.description}
@@ -761,7 +860,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.qty}
+                                      value={editingItem.qty || ''}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -775,7 +874,7 @@ export function LCLTemplateEditor({
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : item.default_qty || 0}
+                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty || '' : (item.default_qty || '') }
                                       onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
                                       disabled={loading}
                                       className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
@@ -787,7 +886,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.rate}
+                                      value={editingItem.rate || ''}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -801,7 +900,7 @@ export function LCLTemplateEditor({
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : item.default_rate || 0}
+                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate || '' : (item.default_rate || '')}
                                       onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
                                       disabled={loading}
                                       className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
