@@ -48,6 +48,14 @@ interface LCLBOQItemEditorProps {
   templateStructure?: LCLTemplateStructure;
 }
 
+const getDraftKey = (structureId: string) => `lcl_boq_creation_draft_${structureId}`;
+
+interface AutosaveDraft {
+  items: ItemSnapshot[];
+  inlineEdits: { [itemId: string]: InlineEdit };
+  lastSavedAt: string;
+}
+
 export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEditorProps>(function LCLBOQItemEditor({
   data,
   templateStructure,
@@ -55,10 +63,13 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<'unsaved' | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [draftPending, setDraftPending] = useState(false);
   const [addItemForm, setAddItemForm] = useState<AddItemForm | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<{ type: 'section' | 'item'; id: string; label: string } | null>(null);
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,9 +96,14 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     },
     markAsSaved: () => {
       setInlineEdits({});
-      setSaveStatus(null);
+      inlineEditsRef.current = {};
+      setDraftPending(false);
+      setLastSavedTime(new Date().toISOString());
+      try {
+        localStorage.removeItem(getDraftKey(data.structure_id));
+      } catch { /* ignore */ }
     },
-  }), [items, inlineEdits]);
+  }), [items, inlineEdits, data.structure_id]);
 
   const flattenHierarchyToSnapshot = (hierarchicalData: LCLHierarchicalData): ItemSnapshot[] => {
     const snapshot: ItemSnapshot[] = [];
@@ -113,9 +129,36 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   };
 
   useEffect(() => {
-    setItems(flattenHierarchyToSnapshot(data));
-    setInlineEdits({});
-    inlineEditsRef.current = {};
+    let restoredItems: ItemSnapshot[] | null = null;
+    let restoredEdits: { [itemId: string]: InlineEdit } | null = null;
+    let restoredLastSavedAt: string | null = null;
+
+    try {
+      const raw = localStorage.getItem(getDraftKey(data.structure_id));
+      if (raw) {
+        const draft: AutosaveDraft = JSON.parse(raw);
+        if (draft.items?.length && draft.inlineEdits && Object.keys(draft.inlineEdits).length > 0) {
+          restoredItems = draft.items;
+          restoredEdits = draft.inlineEdits;
+          restoredLastSavedAt = draft.lastSavedAt || null;
+        }
+      }
+    } catch { /* ignore */ }
+
+    if (restoredItems && restoredEdits) {
+      setItems(restoredItems);
+      setInlineEdits(restoredEdits);
+      inlineEditsRef.current = restoredEdits;
+      setDraftPending(true);
+      if (restoredLastSavedAt) {
+        setLastSavedTime(restoredLastSavedAt);
+      }
+    } else {
+      setItems(flattenHierarchyToSnapshot(data));
+      setInlineEdits({});
+      inlineEditsRef.current = {};
+    }
+
     const letterSet = new Set<string>();
     data.sections.forEach((section) => {
       const match = section.section_id?.match(/section[_-]?([a-z])/i);
@@ -125,6 +168,48 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     });
     setExpandedSections(letterSet);
   }, [data]);
+
+  // Autosave draft to localStorage every 5 seconds
+  useEffect(() => {
+    if (!draftPending) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      setIsSaving(true);
+      try {
+        const draft: AutosaveDraft = {
+          items,
+          inlineEdits,
+          lastSavedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(getDraftKey(data.structure_id), JSON.stringify(draft));
+        setLastSavedTime(draft.lastSavedAt);
+        setDraftPending(false);
+      } catch (error) {
+        console.error('Failed to autosave draft:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 5000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [draftPending, items, inlineEdits, data.structure_id]);
+
+  // Cleanup autosave timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const getSectionLetter = (sectionId: string): string => {
     const match = sectionId?.match(/section[_-]?([a-z])/i);
@@ -160,7 +245,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       ...prev,
       [`item-${itemIndex}`]: { ...prev[`item-${itemIndex}`], qty: finalQty },
     }));
-    setSaveStatus('unsaved');
+    setDraftPending(true);
   };
 
   const handleRateChange = (itemIndex: number, value: string) => {
@@ -171,7 +256,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       ...prev,
       [`item-${itemIndex}`]: { ...prev[`item-${itemIndex}`], rate: finalRate },
     }));
-    setSaveStatus('unsaved');
+    setDraftPending(true);
   };
 
   const handleDescriptionChange = (itemIndex: number, value: string) => {
@@ -179,7 +264,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       ...prev,
       [`item-${itemIndex}`]: { ...prev[`item-${itemIndex}`], description: value },
     }));
-    setSaveStatus('unsaved');
+    setDraftPending(true);
   };
 
   const handleRemoveSection = (sectionId: string, sectionName: string) => {
@@ -192,7 +277,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
 
   const confirmRemove = () => {
     if (!removeConfirm) return;
-    setSaveStatus('unsaved');
+    setDraftPending(true);
     if (removeConfirm.type === 'section') {
       setItems((prev) => {
         const updatedItems = prev.filter((item) => item.section_id !== removeConfirm.id);
@@ -224,11 +309,12 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
 
   const handleAddItem = (subsectionId: string, sectionLetter: string) => {
     setAddItemForm({ subsectionId, sectionLetter });
-    setSaveStatus('unsaved');
+    setDraftPending(true);
   };
 
   const confirmAddItem = (description: string, unit: string, qty: number, rate: number) => {
     if (!addItemForm) return;
+    setDraftPending(true);
     const section = data.sections.find(
       (s) => getSectionLetter(s.section_id) === addItemForm.sectionLetter
     );
@@ -266,10 +352,20 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
 
   return (
     <div className="space-y-4">
-      {saveStatus === 'unsaved' && (
+      {isSaving && (
+        <div className="flex items-center gap-2 p-3 rounded text-sm bg-amber-50 text-amber-900">
+          <span>Saving draft...</span>
+        </div>
+      )}
+      {!isSaving && draftPending && (
         <div className="flex items-center gap-2 p-3 rounded text-sm bg-yellow-50 text-yellow-900">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>Unsaved changes</span>
+        </div>
+      )}
+      {!isSaving && !draftPending && lastSavedTime && (
+        <div className="flex items-center gap-2 p-3 rounded text-sm bg-green-50 text-green-900">
+          <span>Saved at {new Date(lastSavedTime).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       )}
 

@@ -39,6 +39,7 @@ export default function LCLTemplate() {
   const [boqDate, setBoqDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [lclBoqRecord, setLclBoqRecord] = useState<LCLBOQRecord | null>(null);
   const editorRef = useRef<LCLBOQItemEditorHandle>(null);
+  const headerAutosaveRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadLCLBOQData = async () => {
     if (!companyId) return;
@@ -140,6 +141,7 @@ export default function LCLTemplate() {
       const saved = await lclBoqService.saveLCLBOQ(boqData);
       setLclBoqRecord(saved);
       editorRef.current?.markAsSaved();
+      try { localStorage.removeItem('lcl_boq_creation_header'); } catch { /* ignore */ }
 
       // Create or update corresponding BOQ record in boqs table
       try {
@@ -174,6 +176,7 @@ export default function LCLTemplate() {
           description: 'LCL BOQ saved, but failed to create corresponding BOQ record. Please contact support.',
           variant: 'destructive',
         });
+        try { localStorage.removeItem('lcl_boq_creation_header'); } catch { /* ignore */ }
         return;
       }
 
@@ -265,6 +268,40 @@ export default function LCLTemplate() {
   useEffect(() => {
     loadLCLBOQData();
   }, [companyId]);
+
+  // Autosave header fields to localStorage (2s debounce)
+  useEffect(() => {
+    if (headerAutosaveRef.current) {
+      clearTimeout(headerAutosaveRef.current);
+    }
+    headerAutosaveRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem('lcl_boq_creation_header', JSON.stringify({
+          selectedCustomerId,
+          projectTitle,
+          boqDate,
+          lastSavedAt: new Date().toISOString(),
+        }));
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => {
+      if (headerAutosaveRef.current) clearTimeout(headerAutosaveRef.current);
+    };
+  }, [selectedCustomerId, projectTitle, boqDate]);
+
+  // Restore header fields from localStorage after data loads
+  useEffect(() => {
+    if (!hierarchicalData) return;
+    try {
+      const raw = localStorage.getItem('lcl_boq_creation_header');
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.selectedCustomerId) setSelectedCustomerId(saved.selectedCustomerId);
+        if (saved.projectTitle) setProjectTitle(saved.projectTitle);
+        if (saved.boqDate) setBoqDate(saved.boqDate);
+      }
+    } catch { /* ignore */ }
+  }, [hierarchicalData]);
 
   if (loading) {
     return (
