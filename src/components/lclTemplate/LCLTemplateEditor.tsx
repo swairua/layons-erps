@@ -378,6 +378,13 @@ export function LCLTemplateEditor({
     };
   }, [inlineEdits, data.structure_id]);
 
+  // Clear unsaved status when all inline edits have been saved
+  useEffect(() => {
+    if (Object.keys(inlineEdits).length === 0) {
+      setHasUnsavedChanges(false);
+    }
+  }, [inlineEdits]);
+
   // Cleanup debounce timers on unmount
   useEffect(() => {
     return () => {
