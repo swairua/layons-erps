@@ -217,6 +217,7 @@ export function LCLTemplateEditor({
 
       // Save first edit to localStorage immediately for recovery
       if (Object.keys(prev).length === 0) {
+        setHasUnsavedChanges(true);
         try {
           saveDraftToLocalStorage(data.structure_id, newEdits);
         } catch (error) {
@@ -251,6 +252,7 @@ export function LCLTemplateEditor({
 
       // Save first edit to localStorage immediately for recovery
       if (Object.keys(prev).length === 0) {
+        setHasUnsavedChanges(true);
         try {
           saveDraftToLocalStorage(data.structure_id, newEdits);
         } catch (error) {
@@ -332,12 +334,6 @@ export function LCLTemplateEditor({
     latestInlineEditsRef.current = inlineEdits;
   }, [inlineEdits]);
 
-  // Mark as unsaved when user makes new edits, clear when all saved
-  useEffect(() => {
-    const hasEdits = Object.keys(inlineEdits).length > 0;
-    console.log('[LCLEditor] inlineEdits changed, hasEdits:', hasEdits, 'inlineEdits:', inlineEdits);
-    setHasUnsavedChanges(hasEdits);
-  }, [inlineEdits]);
 
   // Load draft from localStorage on mount
   useEffect(() => {
