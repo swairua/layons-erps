@@ -309,6 +309,8 @@ export function LCLTemplateEditor({
         // Clear draft if no more unsaved edits
         if (Object.keys(updated).length === 0) {
           clearDraftFromLocalStorage(data.structure_id);
+          setHasUnsavedChanges(false);
+          setLastSavedTime(new Date().toISOString());
         }
 
         return updated;
