@@ -167,9 +167,15 @@ export class LCLTemplateService {
   ): Promise<LCLTemplateItem[]> {
     const updatedItems: LCLTemplateItem[] = [];
 
+    // Only update items that have valid IDs (skip items with missing IDs)
     for (let index = 0; index < itemIds.length; index++) {
       const itemId = itemIds[index];
       const sortOrder = sortOrders[index];
+
+      // Skip empty IDs (items created locally without DB entry)
+      if (!itemId) {
+        continue;
+      }
 
       const updated = await this.updateItem(itemId, {
         sort_order: sortOrder,

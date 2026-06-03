@@ -361,11 +361,13 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       return;
     }
 
-    // Find indices within the subsection by id
-    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item.id === draggedItem.id);
-    const targetIdxInSubsection = subsectionItems.findIndex((item) => item.id === items[targetIndex].id);
+    // Use positional matching instead of ID-based matching
+    // This works for items with or without IDs
+    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item === draggedItem);
+    const targetItemInSubsection = items[targetIndex];
+    const targetIdxInSubsection = subsectionItems.findIndex((item) => item === targetItemInSubsection);
 
-    if (draggedIdxInSubsection === targetIdxInSubsection) {
+    if (draggedIdxInSubsection === -1 || targetIdxInSubsection === -1 || draggedIdxInSubsection === targetIdxInSubsection) {
       setDraggedItemIndex(null);
       setDragOverItemIndex(null);
       return;
@@ -385,7 +387,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     // Rebuild full items array with reordered subsection
     const newItems = items.map((item) => {
       if (item.section_id === sectionId && item.subsection_id === subsectionId) {
-        const found = renumbered.find((r) => r.id === item.id);
+        const found = renumbered.find((r) => r === item);
         return found || item;
       }
       return item;
@@ -449,6 +451,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     }, 0);
 
     const newItem: ItemSnapshot = {
+      id: crypto.randomUUID(),
       section_id: section.section_id,
       section_name: section.section_name,
       subsection_id: subsection.subsection_id,
