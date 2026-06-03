@@ -30,7 +30,7 @@ import {
   loadDraftFromLocalStorage,
   clearDraftFromLocalStorage,
 } from '@/utils/lclTemplateAutosaveUtils';
-import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
+import { formatNumberWithoutTrailingZeros, formatLCLAmount } from '@/utils/numberFormatter';
 import { LCLTemplateSaveIndicator } from './LCLTemplateSaveIndicator';
 
 interface LCLTemplateEditorProps {
@@ -711,7 +711,7 @@ export function LCLTemplateEditor({
           <p className="text-sm font-medium">
             Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              Ksh{formatNumberWithoutTrailingZeros(getGrandTotal())}
+              Ksh{formatLCLAmount(getGrandTotal())}
             </span>
           </p>
         </div>
@@ -753,7 +753,7 @@ export function LCLTemplateEditor({
                   })()}
                 </div>
                 <p className="text-sm font-medium">
-                  Section Total (KES): Ksh{formatNumberWithoutTrailingZeros(totals[section.section_id]?.section || 0)}
+                  Section Total (KES): Ksh{formatLCLAmount(totals[section.section_id]?.section || 0)}
                 </p>
               </button>
               <Button
