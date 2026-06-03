@@ -158,6 +158,35 @@ export class LCLTemplateService {
     return updatedItems;
   }
 
+  async updateItemsSortOrder(
+    structureId: string,
+    sectionId: string,
+    subsectionId: string,
+    itemIds: string[],
+    sortOrders: number[]
+  ): Promise<LCLTemplateItem[]> {
+    const updatedItems: LCLTemplateItem[] = [];
+
+    // Only update items that have valid IDs (skip items with missing IDs)
+    for (let index = 0; index < itemIds.length; index++) {
+      const itemId = itemIds[index];
+      const sortOrder = sortOrders[index];
+
+      // Skip empty IDs (items created locally without DB entry)
+      if (!itemId) {
+        continue;
+      }
+
+      const updated = await this.updateItem(itemId, {
+        sort_order: sortOrder,
+        item_number: String(index + 1),
+      });
+      updatedItems.push(updated);
+    }
+
+    return updatedItems;
+  }
+
   async getHierarchicalData(
     structureId: string
   ): Promise<LCLHierarchicalData> {
