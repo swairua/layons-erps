@@ -795,7 +795,7 @@ export function LCLTemplateEditor({
                         </p>
                       </div>
                       <p className="text-sm">
-                        Subtotal (KES): Ksh{formatNumber(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
+                        Subtotal (KES): Ksh{formatLCLAmount(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
                       </p>
                     </button>
 
