@@ -74,6 +74,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   const [draftPending, setDraftPending] = useState(false);
   const [addItemForm, setAddItemForm] = useState<AddItemForm | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<{ type: 'section' | 'item'; id: string; label: string } | null>(null);
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const [dragOverItemIndex, setDragOverItemIndex] = useState<number | null>(null);
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -318,6 +320,104 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setRemoveConfirm(null);
   };
 
+  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, itemIndex: number) => {
+    setDraggedItemIndex(itemIndex);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, itemIndex: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemIndex(itemIndex);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemIndex(null);
+  };
+
+  const handleDrop = (
+    e: React.DragEvent<HTMLTableRowElement>,
+    targetIndex: number,
+    subsectionItems: ItemSnapshot[],
+    sectionId: string,
+    subsectionId: string
+  ) => {
+    e.preventDefault();
+
+    if (draggedItemIndex === null) return;
+
+    const draggedItem = items[draggedItemIndex];
+
+    // Only allow drops within the same subsection
+    if (draggedItem.subsection_id !== subsectionId) {
+      setDraggedItemIndex(null);
+      setDragOverItemIndex(null);
+      return;
+    }
+
+    // Find indices within the subsection
+    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item === draggedItem);
+    const targetIdxInSubsection = subsectionItems.findIndex((item) => item === items[targetIndex]);
+
+    if (draggedIdxInSubsection === targetIdxInSubsection) {
+      setDraggedItemIndex(null);
+      setDragOverItemIndex(null);
+      return;
+    }
+
+    // Reorder subsection items
+    const reordered = [...subsectionItems];
+    reordered.splice(draggedIdxInSubsection, 1);
+    reordered.splice(targetIdxInSubsection, 0, draggedItem);
+
+    // Renumber items in the subsection
+    const renumbered = reordered.map((item, idx) => ({
+      ...item,
+      item_number: String(idx + 1),
+    }));
+
+    // Rebuild full items array with reordered subsection
+    const newItems = items.map((item) => {
+      if (item.section_id === sectionId && item.subsection_id === subsectionId) {
+        const found = renumbered.find((r) => r.description === item.description && r.unit === item.unit && r.qty === item.qty && r.rate === item.rate);
+        return found || item;
+      }
+      return item;
+    });
+
+    setItems(newItems);
+    setDraftPending(true);
+    setDraggedItemIndex(null);
+    setDragOverItemIndex(null);
+
+    // Persist to database immediately if companyId is provided
+    if (companyId) {
+      (async () => {
+        try {
+          await lclBoqService.autosaveLCLBOQDraftWithUpsert({
+            company_id: companyId,
+            number: 'DRAFT',
+            items_snapshot: newItems,
+            status: 'draft',
+          });
+          toast({ title: 'Success', description: 'Item reordered and saved.' });
+        } catch (error) {
+          console.error('Failed to persist reorder:', error);
+          toast({
+            title: 'Warning',
+            description: 'Item reordered locally but failed to save to database.',
+            variant: 'destructive',
+          });
+        }
+      })();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemIndex(null);
+    setDragOverItemIndex(null);
+  };
+
   const handleAddItem = (subsectionId: string, sectionLetter: string) => {
     setAddItemForm({ subsectionId, sectionLetter });
     setDraftPending(true);
@@ -505,7 +605,20 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                           </TableHeader>
                           <TableBody>
                             {entry.itemsWithAmount.map((ia, idx) => (
-                              <TableRow key={idx}>
+                              <TableRow
+                                key={idx}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, ia.fullIndex)}
+                                onDragOver={(e) => handleDragOver(e, ia.fullIndex)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, ia.fullIndex, entry.itemsWithAmount.map((x) => x.item), sectionId, entry.subsectionId)}
+                                onDragEnd={handleDragEnd}
+                                className={`
+                                  cursor-grab active:cursor-grabbing
+                                  ${draggedItemIndex === ia.fullIndex ? 'opacity-50 bg-muted' : ''}
+                                  ${dragOverItemIndex === ia.fullIndex ? 'border-t-2 border-blue-500' : ''}
+                                `}
+                              >
                                 <TableCell className="text-xs text-muted-foreground">
                                   {ia.item.item_number}
                                 </TableCell>
