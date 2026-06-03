@@ -122,6 +122,35 @@ class LCLBOQService {
   }
 
   /**
+   * Auto-save draft with upsert logic
+   * Maintains a single draft per company by checking for existing draft and updating it
+   * rather than creating a new one, avoiding UNIQUE constraint violations
+   */
+  async autosaveLCLBOQDraftWithUpsert(boq: LCLBOQRecord): Promise<LCLBOQRecord> {
+    // Query for existing draft with number='DRAFT' for this company
+    const { data: existingDraft } = await supabase
+      .from('lcl_boqs')
+      .select('id')
+      .eq('company_id', boq.company_id)
+      .eq('number', 'DRAFT')
+      .single();
+
+    // If draft exists, update it; otherwise create new one
+    if (existingDraft) {
+      return this.saveLCLBOQ({
+        ...boq,
+        id: existingDraft.id,
+        status: 'draft',
+      });
+    } else {
+      return this.saveLCLBOQ({
+        ...boq,
+        status: 'draft',
+      });
+    }
+  }
+
+  /**
    * Save final version (update status to 'saved')
    */
   async saveLCLBOQFinal(boq: LCLBOQRecord): Promise<LCLBOQRecord> {

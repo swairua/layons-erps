@@ -360,8 +360,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     if (companyId) {
       try {
         const updatedItems = [...items, newItem];
-        // Save draft BOQ with updated items
-        await lclBoqService.autosaveLCLBOQDraft({
+        // Save draft BOQ with updated items using upsert to maintain single draft per company
+        await lclBoqService.autosaveLCLBOQDraftWithUpsert({
           company_id: companyId,
           number: 'DRAFT',
           items_snapshot: updatedItems,
