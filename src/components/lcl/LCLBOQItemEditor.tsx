@@ -680,7 +680,7 @@ function AddItemRow({
             onClick={() => onConfirm(description, unit, parseFloat(qty || '0'), parseFloat(rate || '0'))}
             className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
           >
-            Confirm Addition
+            Confirm
           </Button>
           <Button
             size="sm"
