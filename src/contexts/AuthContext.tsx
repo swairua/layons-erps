@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Fetch user profile from database with error handling and retry logic
   const fetchProfile = useCallback(async (userId: string, showErrorToast: boolean = false): Promise<UserProfile | null> => {
-    const maxRetries = 3;
+    const maxRetries = 2;
     let lastError: any = null;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -153,8 +153,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                               errorMsg.includes('fetch');
 
         if (isNetworkError && attempt < maxRetries - 1) {
-          // Wait before retrying (exponential backoff: 500ms, 1s, 2s)
-          const delayMs = 500 * Math.pow(2, attempt);
+          // Wait before retrying (exponential backoff: 300ms, 600ms)
+          const delayMs = 300 * Math.pow(2, attempt);
           console.warn(`Profile fetch network error (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delayMs}ms... Error: ${errorMsg}`);
           await new Promise(resolve => setTimeout(resolve, delayMs));
           continue;
@@ -309,11 +309,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    // CRITICAL: Ensure initialization completes within 3 seconds no matter what
+    // CRITICAL: Ensure initialization completes within 2 seconds no matter what
     const hardTimeout = setTimeout(() => {
       console.warn('⚠️ Hard timeout: completing initialization');
       completeInit();
-    }, 3000);
+    }, 2000);
 
     const initializeAuthState = async () => {
       try {
@@ -321,7 +321,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Simple session check with timeout
         const sessionTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 1500);
+          setTimeout(() => reject(new Error('Session check timeout')), 800);
         });
 
         try {
@@ -338,9 +338,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Fetch profile in background with timeout
             const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
               setTimeout(() => {
-                console.warn('⏱️ Profile fetch timeout (5s)');
+                console.warn('⏱️ Profile fetch timeout (1.5s)');
                 resolve(null);
-              }, 5000);
+              }, 1500);
             });
 
             Promise.race([
@@ -437,12 +437,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // This ensures components render with correct role/email filtering
           const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
             setTimeout(() => {
-              console.warn('⏱️ Profile fetch timeout during sign in (5s)');
+              console.warn('⏱️ Profile fetch timeout during sign in (2s)');
               resolve(null);
-            }, 5000); // 5 second timeout for sign in flow
+            }, 2000); // 2 second timeout for sign in flow
           });
 
-          console.log('🔍 Starting profile fetch with 5s timeout...');
+          console.log('🔍 Starting profile fetch with 2s timeout...');
           const userProfile = await Promise.race([
             fetchProfile(signedInUser.id),
             profileTimeoutPromise
@@ -480,7 +480,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setTimeout(() => {
                   console.warn('⏱️ Profile retry timeout');
                   resolve(null);
-                }, 10000); // 10 second timeout for background retry
+                }, 5000); // 5 second timeout for background retry
               });
 
               Promise.race([
