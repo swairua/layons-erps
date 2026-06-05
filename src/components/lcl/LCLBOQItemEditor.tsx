@@ -450,27 +450,88 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setEditingSectionName(getDisplaySectionName(currentName));
   };
 
-  const handleSaveSectionTitle = (sectionLetter: string) => {
+  const handleSaveSectionTitle = async (sectionLetter: string) => {
     if (!editingSectionName.trim()) {
       return;
     }
 
-    setItems((prev) => {
-      const updatedItems = prev.map((item) => {
-        if (getSectionLetter(item.section_id) === sectionLetter) {
-          return {
-            ...item,
-            section_name: buildSectionDisplayHeader(sectionLetter, editingSectionName),
-          };
+    const newSectionName = editingSectionName;
+
+    // If linked to a template structure, trigger renumbering on the template
+    if (structureId && templateStructure) {
+      try {
+        // Find the section ID from the template structure that corresponds to this letter
+        const section = templateStructure.structure_data.sections.find(
+          (s: any) => getSectionLetter(s.id) === sectionLetter
+        );
+
+        if (section) {
+          // Ensure section letters are sequential in the template
+          await lclTemplateService.ensureSectionLettersAreSequential(structureId);
+
+          // Reload data from the template
+          const updatedHierarchy = await lclTemplateService.getHierarchicalData(structureId);
+
+          // Flatten and update items with new section names from the template
+          const updatedItems = flattenHierarchyToSnapshot(updatedHierarchy);
+          setItems(updatedItems);
         }
-        return item;
-      });
-      return updatedItems;
-    });
+      } catch (error) {
+        console.error('Failed to renumber sections:', error);
+        // Fall back to local renumbering if template sync fails
+        applyLocalSectionRenumbering(sectionLetter, newSectionName);
+      }
+    } else {
+      // For unlinked snapshots, use local relabeling only
+      applyLocalSectionRenumbering(sectionLetter, newSectionName);
+    }
 
     setDraftPending(true);
     setEditingSectionLetter(null);
     setEditingSectionName('');
+  };
+
+  const applyLocalSectionRenumbering = (editingSectionLetter: string, newSectionName: string) => {
+    setItems((prev) => {
+      // Extract all unique section letters and sort them
+      const sectionLetters = new Set<string>();
+      prev.forEach((item) => {
+        const letter = getSectionLetter(item.section_id);
+        if (letter) {
+          sectionLetters.add(letter);
+        }
+      });
+
+      const sortedLetters = Array.from(sectionLetters).sort();
+
+      // Create mapping of old letters to new letters
+      const letterMap = new Map<string, string>();
+      sortedLetters.forEach((letter, index) => {
+        const newLetter = String.fromCharCode(65 + index);
+        letterMap.set(letter, newLetter);
+      });
+
+      // Update items with new section names based on renumbered letters
+      const updatedItems = prev.map((item) => {
+        const oldLetter = getSectionLetter(item.section_id);
+        const newLetter = letterMap.get(oldLetter);
+
+        if (newLetter && oldLetter !== newLetter) {
+          return {
+            ...item,
+            section_name: buildSectionDisplayHeader(newLetter, newSectionName),
+          };
+        } else if (oldLetter === editingSectionLetter) {
+          return {
+            ...item,
+            section_name: buildSectionDisplayHeader(oldLetter, newSectionName),
+          };
+        }
+        return item;
+      });
+
+      return updatedItems;
+    });
   };
 
   const handleCancelEditSection = () => {
