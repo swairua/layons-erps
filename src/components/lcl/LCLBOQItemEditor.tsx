@@ -16,7 +16,7 @@ import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { lclBoqService } from '@/services/lclBoqService';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
-import { getDisplaySectionName } from '@/utils/lclSectionDisplayUtils';
+import { getDisplaySectionName, buildSectionDisplayHeader } from '@/utils/lclSectionDisplayUtils';
 
 export interface ItemSnapshot {
   id?: string;
@@ -81,6 +81,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   const [removeConfirm, setRemoveConfirm] = useState<{ type: 'section' | 'item'; id: string; label: string } | null>(null);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   const [dragOverItemIndex, setDragOverItemIndex] = useState<number | null>(null);
+  const [editingSectionLetter, setEditingSectionLetter] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState<string>('');
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -443,6 +445,39 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setDragOverItemIndex(null);
   };
 
+  const handleEditSectionTitle = (sectionLetter: string, currentName: string) => {
+    setEditingSectionLetter(sectionLetter);
+    setEditingSectionName(getDisplaySectionName(currentName));
+  };
+
+  const handleSaveSectionTitle = (sectionLetter: string) => {
+    if (!editingSectionName.trim()) {
+      return;
+    }
+
+    setItems((prev) => {
+      const updatedItems = prev.map((item) => {
+        if (getSectionLetter(item.section_id) === sectionLetter) {
+          return {
+            ...item,
+            section_name: buildSectionDisplayHeader(sectionLetter, editingSectionName),
+          };
+        }
+        return item;
+      });
+      return updatedItems;
+    });
+
+    setDraftPending(true);
+    setEditingSectionLetter(null);
+    setEditingSectionName('');
+  };
+
+  const handleCancelEditSection = () => {
+    setEditingSectionLetter(null);
+    setEditingSectionName('');
+  };
+
   const handleAddItem = (subsectionId: string, sectionLetter: string) => {
     setAddItemForm({ subsectionId, sectionLetter });
     setDraftPending(true);
@@ -589,9 +624,33 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                   <ChevronRight
                     className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   />
-                  <span className="font-semibold text-sm truncate">
-                    SECTION {sectionLetter}: {getDisplaySectionName(sectionName)}
-                  </span>
+                  {editingSectionLetter === sectionLetter ? (
+                    <Input
+                      value={editingSectionName}
+                      onChange={(e) => setEditingSectionName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveSectionTitle(sectionLetter);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEditSection();
+                        }
+                      }}
+                      className="h-7 font-semibold text-sm flex-1"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditSectionTitle(sectionLetter, sectionName);
+                      }}
+                      className="font-semibold text-sm hover:bg-muted px-2 py-1 rounded transition-colors truncate"
+                      title="Click to edit section title"
+                    >
+                      SECTION {sectionLetter}: {getDisplaySectionName(sectionName)}
+                    </button>
+                  )}
                 </button>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-sm font-medium tabular-nums">
