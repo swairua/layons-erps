@@ -371,6 +371,91 @@ export class LCLTemplateService {
     return await this.getStructure(structureId);
   }
 
+  async ensureSectionLettersAreSequential(
+    structureId: string
+  ): Promise<LCLTemplateStructure> {
+    const structure = await this.getStructure(structureId);
+    const sections = structure.structure_data.sections;
+
+    // Create mapping of old section IDs to new section IDs with consecutive letters
+    const sectionIdMap = new Map<string, string>();
+    const updatedSections = sections.map((section: any, index: number) => {
+      const newLetter = String.fromCharCode(65 + index);
+      const oldId = section.id;
+      const newId = `section_${newLetter.toLowerCase()}`;
+
+      sectionIdMap.set(oldId, newId);
+
+      // Extract custom name and update with new letter
+      const nameMatch = section.name.match(/^(?:SECTION|Section)\s+[A-Z]:\s*(.+)$/);
+      const customName = nameMatch ? nameMatch[1] : section.name;
+
+      // Also rebuild subsection IDs to match the new section ID
+      const updatedSubsections = section.subsections.map(
+        (subsection: any) => {
+          const oldSubsectionId = subsection.id;
+          const oldLetter = oldId.match(/section_([a-z])/)?.[1] || '';
+          const newLetter = newId.match(/section_([a-z])/)?.[1] || '';
+          const newSubsectionId = oldSubsectionId.replace(
+            new RegExp(oldLetter, 'g'),
+            newLetter
+          );
+          sectionIdMap.set(oldSubsectionId, newSubsectionId);
+          return {
+            ...subsection,
+            id: newSubsectionId,
+          };
+        }
+      );
+
+      return {
+        ...section,
+        id: newId,
+        name: `SECTION ${newLetter}: ${customName}`,
+        subsections: updatedSubsections,
+      };
+    });
+
+    // Only update if there are actual changes
+    const hasChanges = sectionIdMap.size > sections.length;
+    if (!hasChanges) {
+      return structure;
+    }
+
+    // Update all item references to use new section and subsection IDs
+    const items = await this.getStructureItems(structureId);
+    for (const item of items) {
+      const newSectionId = sectionIdMap.get(item.section_id);
+      const newSubsectionId = sectionIdMap.get(item.subsection_id);
+
+      if (newSectionId && newSubsectionId) {
+        await this.updateItem(item.id, {
+          section_id: newSectionId,
+          subsection_id: newSubsectionId,
+        });
+      } else if (newSectionId && !newSubsectionId) {
+        const oldLetter = item.section_id.match(/section_([a-z])/)?.[1] || '';
+        const newLetterFromId = newSectionId.match(/section_([a-z])/)?.[1] || '';
+        const newSubId = item.subsection_id
+          .replace(item.section_id, newSectionId)
+          .replace(new RegExp(oldLetter, 'g'), newLetterFromId);
+        await this.updateItem(item.id, {
+          section_id: newSectionId,
+          subsection_id: newSubId,
+        });
+      }
+    }
+
+    // Persist updated sections
+    await this.updateStructure(structureId, {
+      structure_data: {
+        sections: updatedSections,
+      },
+    });
+
+    return await this.getStructure(structureId);
+  }
+
   async addSection(
     structureId: string,
     customName?: string

@@ -702,6 +702,9 @@ export function LCLTemplateEditor({
         },
       });
 
+      // Trigger section letter sequencing to ensure consistency
+      await lclTemplateService.ensureSectionLettersAreSequential(data.structure_id);
+
       // Also update section names in current inline edits context if needed
       const updatedInlineEdits = { ...inlineEdits };
       setInlineEdits(updatedInlineEdits);
