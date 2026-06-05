@@ -16,6 +16,7 @@ import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { lclBoqService } from '@/services/lclBoqService';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
+import { getDisplaySectionName } from '@/utils/lclSectionDisplayUtils';
 
 export interface ItemSnapshot {
   id?: string;
@@ -579,7 +580,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                     className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   />
                   <span className="font-semibold text-sm truncate">
-                    SECTION {sectionLetter}: {sectionName}
+                    SECTION {sectionLetter}: {getDisplaySectionName(sectionName)}
                   </span>
                 </button>
                 <div className="flex items-center gap-3 shrink-0">
