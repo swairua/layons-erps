@@ -31,6 +31,7 @@ import {
   clearDraftFromLocalStorage,
 } from '@/utils/lclTemplateAutosaveUtils';
 import { formatNumberWithoutTrailingZeros, formatLCLAmount } from '@/utils/numberFormatter';
+import { getDisplaySectionName, getSectionLetterFromId, buildSectionDisplayHeader } from '@/utils/lclSectionDisplayUtils';
 import { LCLTemplateSaveIndicator } from './LCLTemplateSaveIndicator';
 
 interface LCLTemplateEditorProps {
@@ -52,6 +53,11 @@ interface InlineEdit {
   rate?: number;
 }
 
+interface EditingSectionTitle {
+  sectionId: string;
+  name: string;
+}
+
 export function LCLTemplateEditor({
   data,
   onDataUpdated,
@@ -66,6 +72,7 @@ export function LCLTemplateEditor({
   const [editingItem, setEditingItem] = useState<EditingState | null>(null);
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
+  const [editingSectionTitle, setEditingSectionTitle] = useState<EditingSectionTitle | null>(null);
   const [loading, setLoading] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
@@ -137,14 +144,15 @@ export function LCLTemplateEditor({
   const flattenedItems: FlatItem[] = [];
   data.sections.forEach((section, sectionIndex) => {
     const sectionLetter = String.fromCharCode(65 + sectionIndex);
+    const displayName = getDisplaySectionName(section.section_name);
 
     // Add section header
     flattenedItems.push({
       id: `section-header-${section.section_id}`,
       type: 'sectionHeader',
-      description: `SECTION ${sectionLetter}: ${section.section_name}`,
+      description: `SECTION ${sectionLetter}: ${displayName}`,
       sectionLetter,
-      sectionName: section.section_name,
+      sectionName: displayName,
       sectionId: section.section_id,
     });
 
@@ -579,15 +587,19 @@ export function LCLTemplateEditor({
       const section = data.sections.find((s) => s.section_id === sectionId);
       if (!section) return;
 
+      // Delete all items in the section
       for (const subsection of section.subsections) {
         for (const item of subsection.items) {
           await lclTemplateService.deleteItem(item.id);
         }
       }
 
+      // Renumber display names of sections after the deleted one
+      await lclTemplateService.renumberSectionDisplayNames(data.structure_id, sectionId);
+
       toast({
         title: 'Success',
-        description: 'Section removed successfully.',
+        description: 'Section removed and remaining sections renumbered.',
       });
 
       // Clear inline edits for deleted items
@@ -613,6 +625,66 @@ export function LCLTemplateEditor({
         title: 'Error',
         description:
           error instanceof Error ? error.message : 'Failed to delete section',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditSectionTitle = (sectionId: string, currentName: string) => {
+    setEditingSectionTitle({
+      sectionId,
+      name: getDisplaySectionName(currentName),
+    });
+  };
+
+  const handleSaveSectionTitle = async () => {
+    if (!editingSectionTitle || !editingSectionTitle.name.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Section name cannot be empty.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sectionIndex = data.sections.findIndex(
+        (s) => s.section_id === editingSectionTitle.sectionId
+      );
+      if (sectionIndex === -1) throw new Error('Section not found');
+
+      const sectionLetter = String.fromCharCode(65 + sectionIndex);
+      const newName = buildSectionDisplayHeader(sectionLetter, editingSectionTitle.name);
+
+      // Update the structure data in the template
+      const structure = await lclTemplateService.getStructure(data.structure_id);
+      const updatedSections = structure.structure_data.sections.map((section: any) =>
+        section.id === editingSectionTitle.sectionId
+          ? { ...section, name: newName }
+          : section
+      );
+
+      await lclTemplateService.updateStructure(data.structure_id, {
+        structure_data: {
+          sections: updatedSections,
+        },
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Section name updated successfully.',
+      });
+
+      setEditingSectionTitle(null);
+      await onDataUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to update section name',
         variant: 'destructive',
       });
     } finally {
@@ -733,7 +805,7 @@ export function LCLTemplateEditor({
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
-                  <h3 className="font-semibold">{section.section_name}</h3>
+                  <h3 className="font-semibold">{getDisplaySectionName(section.section_name)}</h3>
                   {(() => {
                     const inheritanceMap: { [key: string]: string } = {
                       'section_d': 'section_b',
@@ -819,7 +891,7 @@ export function LCLTemplateEditor({
                             {isFirstSubsection && (
                               <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default">
                                 <TableCell colSpan={7} className="text-sm font-bold text-gray-700 py-2">
-                                  {section.section_name}
+                                  {getDisplaySectionName(section.section_name)}
                                 </TableCell>
                               </TableRow>
                             )}

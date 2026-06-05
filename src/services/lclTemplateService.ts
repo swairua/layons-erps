@@ -279,6 +279,61 @@ export class LCLTemplateService {
     };
   }
 
+  async renumberSectionDisplayNames(
+    structureId: string,
+    deletedSectionId: string
+  ): Promise<LCLTemplateStructure> {
+    const structure = await this.getStructure(structureId);
+    const sections = structure.structure_data.sections;
+
+    // Find index of deleted section
+    const deletedIndex = sections.findIndex((s: any) => s.id === deletedSectionId);
+    if (deletedIndex === -1) {
+      return structure;
+    }
+
+    // Map old letter to new letter for sections after the deleted one
+    const letterMap = new Map<string, string>();
+    let newLetter = String.fromCharCode(65 + deletedIndex);
+
+    for (let i = deletedIndex + 1; i < sections.length; i++) {
+      const section = sections[i];
+      const oldLetter = String.fromCharCode(65 + i);
+      letterMap.set(oldLetter, newLetter);
+      newLetter = String.fromCharCode(newLetter.charCodeAt(0) + 1);
+    }
+
+    // Renumber display names for affected sections
+    const updatedSections = sections.map((section: any, index: number) => {
+      if (index <= deletedIndex) return section;
+
+      const currentLetter = String.fromCharCode(65 + index);
+      const newLetter = letterMap.get(currentLetter);
+
+      if (newLetter && newLetter !== currentLetter) {
+        // Extract custom name (everything after colon)
+        const nameMatch = section.name.match(/^(?:SECTION|Section)\s+[A-Z]:\s*(.+)$/);
+        const customName = nameMatch ? nameMatch[1] : section.name;
+
+        return {
+          ...section,
+          name: `SECTION ${newLetter}: ${customName}`,
+        };
+      }
+
+      return section;
+    });
+
+    // Persist updated sections
+    await this.updateStructure(structureId, {
+      structure_data: {
+        sections: updatedSections,
+      },
+    });
+
+    return await this.getStructure(structureId);
+  }
+
   async recordHistory(
     structureId: string,
     companyId: string,

@@ -85,6 +85,9 @@ export interface CreateLCLTemplateRequest {
 export interface UpdateLCLTemplateRequest {
   name?: string;
   description?: string;
+  structure_data?: {
+    sections: LCLSectionDef[];
+  };
 }
 
 export interface CreateLCLItemRequest {
