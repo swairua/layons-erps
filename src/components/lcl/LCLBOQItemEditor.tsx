@@ -799,8 +799,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   };
 
   // Group items by section for rendering
-  const sectionLettersFromData = data.sections.map((s) => getSectionLetter(s.section_id));
-  const allSectionLetters = Array.from(new Set([...sectionLettersFromData, ...items.map((item) => getSectionLetter(item.section_id))])).sort();
+  // Use only items to determine which sections to display (not data.sections, which may be stale)
+  const allSectionLetters = Array.from(new Set(items.map((item) => getSectionLetter(item.section_id)))).sort();
   const sectionLetters = allSectionLetters;
 
   return (
