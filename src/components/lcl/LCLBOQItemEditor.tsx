@@ -360,6 +360,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     if (!removeConfirm) return;
     setDraftPending(true);
     if (removeConfirm.type === 'section') {
+      // 1. Update local state immediately for snappy UI
       setItems((prev) => {
         const filtered = prev.filter((item) => item.section_id !== removeConfirm.id);
         const relabeled = relabelSectionsLocally(filtered);
@@ -375,27 +376,35 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
         return relabeled;
       });
 
-      // Best-effort persist; never let a failure navigate or throw
+      // 2. Persist to backend with proper error handling
       if (structureId && templateStructure) {
-        lclTemplateService
-          .renumberSectionDisplayNames(structureId, removeConfirm.id)
-          .then(async () => {
-            const updatedStructure = await lclTemplateService.getStructure(structureId);
-            const allItems = await lclTemplateService.getStructureItems(structureId);
-            const cleanedSections = lclTemplateService.deleteEmptySections(
-              updatedStructure.structure_data.sections,
-              allItems
-            );
-            if (cleanedSections.length < updatedStructure.structure_data.sections.length) {
-              return lclTemplateService.updateStructure(structureId, {
-                structure_data: { sections: cleanedSections },
-              });
-            }
-          })
-          .catch((error) => console.error('Failed to clean up sections:', error));
-      }
+        try {
+          await lclTemplateService.renumberSectionDisplayNames(structureId, removeConfirm.id);
+          const updatedStructure = await lclTemplateService.getStructure(structureId);
+          const allItems = await lclTemplateService.getStructureItems(structureId);
+          const cleanedSections = lclTemplateService.deleteEmptySections(
+            updatedStructure.structure_data.sections,
+            allItems
+          );
+          if (cleanedSections.length < updatedStructure.structure_data.sections.length) {
+            await lclTemplateService.updateStructure(structureId, {
+              structure_data: { sections: cleanedSections },
+            });
+          }
 
-      toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
+          // 3. Fetch fresh hierarchical data and update items to sync with backend
+          const updatedHierarchy = await lclTemplateService.getHierarchicalData(structureId);
+          const updatedItems = flattenHierarchyToSnapshot(updatedHierarchy);
+          setItems(updatedItems);
+
+          toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
+        } catch (error) {
+          console.error('Failed to delete section:', error);
+          toast({ title: 'Error', description: 'Failed to delete section. Please try again.' });
+        }
+      } else {
+        toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
+      }
     } else {
       setItems((prev) => prev.filter((item) => getEditKey(item, -1) !== removeConfirm.id));
       setInlineEdits((edits) => {
@@ -790,8 +799,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   };
 
   // Group items by section for rendering
-  const sectionLettersFromData = data.sections.map((s) => getSectionLetter(s.section_id));
-  const allSectionLetters = Array.from(new Set([...sectionLettersFromData, ...items.map((item) => getSectionLetter(item.section_id))])).sort();
+  // Use only items to determine which sections to display (not data.sections, which may be stale)
+  const allSectionLetters = Array.from(new Set(items.map((item) => getSectionLetter(item.section_id)))).sort();
   const sectionLetters = allSectionLetters;
 
   return (

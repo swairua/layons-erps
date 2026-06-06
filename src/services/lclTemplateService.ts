@@ -313,12 +313,12 @@ export class LCLTemplateService {
         (subsection: any) => {
           const oldSubsectionId = subsection.id;
           // Subsection IDs follow pattern: section_X_X_name, where X is the letter
-          // Replace both occurrences: section_d_d_name -> section_c_c_name
+          // Replace only the section prefix: section_d_... -> section_c_...
           const oldLetter = oldId.match(/section_([a-z])/)?.[1] || '';
           const newLetter = newId.match(/section_([a-z])/)?.[1] || '';
           const newSubsectionId = oldSubsectionId.replace(
-            new RegExp(oldLetter, 'g'),
-            newLetter
+            new RegExp(`^section_${oldLetter}`),
+            `section_${newLetter}`
           );
           sectionIdMap.set(oldSubsectionId, newSubsectionId);
           return {
@@ -397,8 +397,8 @@ export class LCLTemplateService {
           const oldLetter = oldId.match(/section_([a-z])/)?.[1] || '';
           const newLetter = newId.match(/section_([a-z])/)?.[1] || '';
           const newSubsectionId = oldSubsectionId.replace(
-            new RegExp(oldLetter, 'g'),
-            newLetter
+            new RegExp(`^section_${oldLetter}`),
+            `section_${newLetter}`
           );
           sectionIdMap.set(oldSubsectionId, newSubsectionId);
           return {
