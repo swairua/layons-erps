@@ -376,10 +376,23 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       });
 
       // Best-effort persist; never let a failure navigate or throw
-      if (structureId) {
+      if (structureId && templateStructure) {
         lclTemplateService
           .renumberSectionDisplayNames(structureId, removeConfirm.id)
-          .catch((error) => console.error('Failed to renumber sections:', error));
+          .then(async () => {
+            const updatedStructure = await lclTemplateService.getStructure(structureId);
+            const allItems = await lclTemplateService.getStructureItems(structureId);
+            const cleanedSections = lclTemplateService.deleteEmptySections(
+              updatedStructure.structure_data.sections,
+              allItems
+            );
+            if (cleanedSections.length < updatedStructure.structure_data.sections.length) {
+              return lclTemplateService.updateStructure(structureId, {
+                structure_data: { sections: cleanedSections },
+              });
+            }
+          })
+          .catch((error) => console.error('Failed to clean up sections:', error));
       }
 
       toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
@@ -776,14 +789,10 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     }
   };
 
-  const hasItemsInSection = (sectionLetter: string): boolean => {
-    return items.some((item) => getSectionLetter(item.section_id) === sectionLetter);
-  };
-
-  // Group items by section for rendering — filter out empty sections
+  // Group items by section for rendering
   const sectionLettersFromData = data.sections.map((s) => getSectionLetter(s.section_id));
   const allSectionLetters = Array.from(new Set([...sectionLettersFromData, ...items.map((item) => getSectionLetter(item.section_id))])).sort();
-  const sectionLetters = allSectionLetters.filter((letter) => hasItemsInSection(letter));
+  const sectionLetters = allSectionLetters;
 
   return (
     <div className="space-y-4">
