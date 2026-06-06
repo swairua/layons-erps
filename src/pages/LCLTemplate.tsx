@@ -21,10 +21,13 @@ import {
 import { Download, Save } from 'lucide-react';
 
 export default function LCLTemplate() {
+  console.log('[LCLTemplate] Component mounted');
   const { currentCompany, isLoading: isCompanyLoading } = useCurrentCompany();
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
   const { data: customers } = useCustomers(companyId);
+
+  console.log(`[LCLTemplate] Company context - isLoading: ${isCompanyLoading}, companyId: ${companyId}`);
 
   const [hierarchicalData, setHierarchicalData] =
     useState<LCLHierarchicalData | null>(null);
@@ -293,7 +296,12 @@ export default function LCLTemplate() {
   };
 
   useEffect(() => {
-    if (isCompanyLoading) return;
+    console.log(`[LCLTemplate] useEffect triggered - isCompanyLoading: ${isCompanyLoading}`);
+    if (isCompanyLoading) {
+      console.log('[LCLTemplate] Company still loading, skipping loadLCLBOQData');
+      return;
+    }
+    console.log('[LCLTemplate] Calling loadLCLBOQData');
     loadLCLBOQData();
   }, [loadLCLBOQData, isCompanyLoading]);
 
