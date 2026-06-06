@@ -391,6 +391,12 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
               structure_data: { sections: cleanedSections },
             });
           }
+
+          // 3. Fetch fresh hierarchical data and update items to sync with backend
+          const updatedHierarchy = await lclTemplateService.getHierarchicalData(structureId);
+          const updatedItems = flattenHierarchyToSnapshot(updatedHierarchy);
+          setItems(updatedItems);
+
           toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
         } catch (error) {
           console.error('Failed to delete section:', error);
