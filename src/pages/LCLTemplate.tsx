@@ -43,6 +43,7 @@ export default function LCLTemplate() {
   const [lclBoqRecord, setLclBoqRecord] = useState<LCLBOQRecord | null>(null);
   const editorRef = useRef<LCLBOQItemEditorHandle>(null);
   const headerAutosaveRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAttemptedRestoreRef = useRef(false);
 
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
@@ -313,6 +314,10 @@ export default function LCLTemplate() {
 
   // Autosave header fields to localStorage (2s debounce)
   useEffect(() => {
+    if (!hasAttemptedRestoreRef.current) {
+      return;
+    }
+
     if (headerAutosaveRef.current) {
       clearTimeout(headerAutosaveRef.current);
     }
@@ -340,15 +345,33 @@ export default function LCLTemplate() {
   // Restore header fields from localStorage after data loads
   useEffect(() => {
     if (!hierarchicalData) return;
+
+    let hasRestored = false;
     try {
       const raw = localStorage.getItem('lcl_boq_creation_header');
       if (raw) {
         const saved = JSON.parse(raw);
-        if (saved.selectedCustomerId) setSelectedCustomerId(saved.selectedCustomerId);
-        if (saved.projectTitle) setProjectTitle(saved.projectTitle);
-        if (saved.boqDate) setBoqDate(saved.boqDate);
+        if (saved.selectedCustomerId) {
+          setSelectedCustomerId(saved.selectedCustomerId);
+          hasRestored = true;
+        }
+        if (saved.projectTitle) {
+          setProjectTitle(saved.projectTitle);
+          hasRestored = true;
+        }
+        if (saved.boqDate) {
+          setBoqDate(saved.boqDate);
+          hasRestored = true;
+        }
       }
     } catch { /* ignore */ }
+
+    // Mark that we've attempted restoration so autosave can begin
+    hasAttemptedRestoreRef.current = true;
+
+    if (hasRestored) {
+      console.log('[LCLTemplate] ✅ Header fields restored from draft');
+    }
   }, [hierarchicalData]);
 
   if (loading || isCompanyLoading) {
