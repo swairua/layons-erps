@@ -507,15 +507,11 @@ export class LCLTemplateService {
   }
 
   deleteEmptySections(
-    sections: any[]
+    sections: any[],
+    items: LCLTemplateItem[]
   ): any[] {
     return sections.filter((section) => {
-      for (const subsection of section.subsections || []) {
-        if (subsection.id) {
-          return true;
-        }
-      }
-      return false;
+      return items.some((item) => item.section_id === section.id);
     });
   }
 

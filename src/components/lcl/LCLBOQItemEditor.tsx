@@ -379,10 +379,14 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       if (structureId && templateStructure) {
         lclTemplateService
           .renumberSectionDisplayNames(structureId, removeConfirm.id)
-          .then(() => {
-            const structure = templateStructure.structure_data;
-            const cleanedSections = lclTemplateService.deleteEmptySections(structure.sections);
-            if (cleanedSections.length < structure.sections.length) {
+          .then(async () => {
+            const updatedStructure = await lclTemplateService.getStructure(structureId);
+            const allItems = await lclTemplateService.getStructureItems(structureId);
+            const cleanedSections = lclTemplateService.deleteEmptySections(
+              updatedStructure.structure_data.sections,
+              allItems
+            );
+            if (cleanedSections.length < updatedStructure.structure_data.sections.length) {
               return lclTemplateService.updateStructure(structureId, {
                 structure_data: { sections: cleanedSections },
               });
