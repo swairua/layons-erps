@@ -2,13 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Use environment variables (required, no fallback to stale hardcoded values)
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.warn('⚠️ Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
-}
+// Hardcoded Supabase credentials for project eubrvlzkvzevidivsfha
+export const SUPABASE_URL = 'https://eubrvlzkvzevidivsfha.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlYHzHOT9LzEHgNuNfk_Ag_JBvPUWKF';
 
 console.log('✅ Supabase client initializing with URL:', SUPABASE_URL.substring(0, 30) + '...');
 
