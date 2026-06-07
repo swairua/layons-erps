@@ -231,7 +231,10 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       } catch (error) {
         console.error('Failed to autosave draft:', error);
       } finally {
-        setIsSaving(false);
+        // Keep "Saving draft..." visible for at least 1 second for UX feedback
+        setTimeout(() => {
+          setIsSaving(false);
+        }, 1000);
       }
     }, 5000);
 
