@@ -376,7 +376,6 @@ export default function LCLTemplate() {
         <div className="text-center space-y-2">
           <p className="text-muted-foreground">Loading LCL BOQ...</p>
           {isCompanyLoading && <p className="text-xs text-muted-foreground/70">Waiting for company context...</p>}
-          {loading && companyId && <p className="text-xs text-muted-foreground/70">Loading data for company: {companyId}</p>}
         </div>
       </div>
     );
