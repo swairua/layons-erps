@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BOQData } from '@/utils/boqHelper';
 import { reconstructHierarchicalDataFromSnapshot } from '@/utils/lclBoqPdfGenerator';
 import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
+import { invalidateBOQNumberCache } from '@/utils/boqNumberGenerator';
 
 export interface LCLBOQRecord {
   id?: string;
@@ -94,6 +95,12 @@ class LCLBOQService {
       }
 
       console.log('UPDATE successful', { id, updatedId: updated?.id, updatedAt: updated?.updated_at });
+
+      // Invalidate BOQ number cache when updating
+      if (updated?.company_id) {
+        invalidateBOQNumberCache(updated.company_id);
+      }
+
       return updated as LCLBOQRecord;
     } else {
       // Create new
@@ -114,6 +121,12 @@ class LCLBOQService {
       }
 
       console.log('INSERT successful', { createdId: created?.id });
+
+      // Invalidate BOQ number cache when creating new LCL BOQ
+      if (created?.company_id) {
+        invalidateBOQNumberCache(created.company_id);
+      }
+
       return created as LCLBOQRecord;
     }
   }
@@ -237,6 +250,8 @@ class LCLBOQService {
       created_by: createdBy,
     };
 
+    let result: BOQData;
+
     // Check if BOQ already exists by boq_id (for updates)
     if (lclBoq.boq_id) {
       const { data, error } = await supabase
@@ -250,42 +265,47 @@ class LCLBOQService {
         .single();
 
       if (error) throw error;
-      return data as BOQData;
-    }
-
-    // Check if BOQ with this number already exists for this company
-    const { data: existingBoq } = await supabase
-      .from('boqs')
-      .select('id')
-      .eq('company_id', lclBoq.company_id)
-      .eq('number', lclBoq.number)
-      .single();
-
-    if (existingBoq) {
-      // Update existing BOQ (shouldn't happen if boq_id is set, but fallback)
-      const { data, error } = await supabase
-        .from('boqs')
-        .update({
-          ...boqRecord,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingBoq.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as BOQData;
+      result = data as BOQData;
     } else {
-      // Insert new BOQ
-      const { data, error } = await supabase
+      // Check if BOQ with this number already exists for this company
+      const { data: existingBoq } = await supabase
         .from('boqs')
-        .insert([boqRecord])
-        .select()
+        .select('id')
+        .eq('company_id', lclBoq.company_id)
+        .eq('number', lclBoq.number)
         .single();
 
-      if (error) throw error;
-      return data as BOQData;
+      if (existingBoq) {
+        // Update existing BOQ (shouldn't happen if boq_id is set, but fallback)
+        const { data, error } = await supabase
+          .from('boqs')
+          .update({
+            ...boqRecord,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingBoq.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = data as BOQData;
+      } else {
+        // Insert new BOQ
+        const { data, error } = await supabase
+          .from('boqs')
+          .insert([boqRecord])
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = data as BOQData;
+      }
     }
+
+    // Invalidate BOQ number cache after creating/updating BOQ
+    invalidateBOQNumberCache(lclBoq.company_id);
+
+    return result;
   }
 }
 
