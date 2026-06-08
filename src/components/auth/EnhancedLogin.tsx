@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { toast } from '@/utils/safeToast';
 import { handleAuthError } from '@/utils/authErrorHandler';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export function EnhancedLogin() {
   const { signIn, loading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -60,7 +61,8 @@ export function EnhancedLogin() {
         // Ensure error is properly formatted before passing to handler
         handleAuthError(error);
       } else {
-        navigate('/');
+        // Redirect back to the page the user was trying to access, or to dashboard
+        navigate(location.pathname || '/');
       }
     } catch (unexpectedError) {
       // Catch any unexpected errors and format them properly
