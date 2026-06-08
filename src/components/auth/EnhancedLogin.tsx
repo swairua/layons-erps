@@ -11,7 +11,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export function EnhancedLogin() {
-  const { signIn, loading } = useAuth();
+  const { signIn, loading, isAuthenticated } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,9 +60,35 @@ export function EnhancedLogin() {
       if (error) {
         // Ensure error is properly formatted before passing to handler
         handleAuthError(error);
+        setSubmitting(false);
       } else {
+        // Wait for auth state to stabilize before navigating
+        console.log('🔄 [EnhancedLogin] Waiting for auth state stabilization...');
+
+        let authStable = false;
+        let waitAttempts = 0;
+        const maxWaitAttempts = 50; // 5 seconds max (50 * 100ms)
+
+        while (!authStable && waitAttempts < maxWaitAttempts) {
+          // Check if we're authenticated in the context
+          if (isAuthenticated) {
+            authStable = true;
+            console.log('✅ [EnhancedLogin] Auth state stable, navigating...');
+            break;
+          }
+
+          // Wait a bit before checking again
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitAttempts++;
+        }
+
+        if (!authStable) {
+          console.warn('⚠️ [EnhancedLogin] Auth state did not stabilize within timeout, navigating anyway');
+        }
+
         // Redirect back to the page the user was trying to access, or to dashboard
         navigate(location.pathname || '/');
+        setSubmitting(false);
       }
     } catch (unexpectedError) {
       // Catch any unexpected errors and format them properly
@@ -86,7 +112,6 @@ export function EnhancedLogin() {
         error: unexpectedError
       });
       toast.error(errorMessage || 'An unexpected error occurred. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -14,10 +14,18 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [loadingStartTime] = useState(Date.now());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const authInitCompleted = useRef(false);
 
   // Routes that don't require authentication
   const publicRoutes = ['/auth-test', '/manual-setup', '/database-fix-page', '/auto-fix', '/audit', '/auto-payment-sync', '/payment-sync', '/admin-recreate'];
   const isPublicRoute = publicRoutes.includes(location.pathname);
+
+  // Track when auth init completes
+  useEffect(() => {
+    if (!loading) {
+      authInitCompleted.current = true;
+    }
+  }, [loading]);
 
   // Log auth state changes
   useEffect(() => {
@@ -25,7 +33,8 @@ export function Layout({ children }: LayoutProps) {
   }, [isAuthenticated, loading, location.pathname]);
 
   // Show login after initial auth completes to avoid redirect bounce
-  if (!loading && !isAuthenticated && !isPublicRoute) {
+  // Only show login if auth init has definitely completed AND user is still not authenticated
+  if (!loading && !isAuthenticated && !isPublicRoute && authInitCompleted.current) {
     console.log(`🔓 [Layout] Showing login - auth complete but user not authenticated, route: ${location.pathname}`);
     return <EnhancedLogin />;
   }

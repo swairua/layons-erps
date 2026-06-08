@@ -593,20 +593,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           };
           setProfile(fallbackProfile);
         }
+        clearTimeout(hardTimeoutId);
+        setTimeout(() => toast.success('Signed in successfully'), 0);
+        return { error: null };
       } else {
         console.warn('⚠️ No user returned from sign in');
+        clearTimeout(hardTimeoutId);
         setLoading(false);
+        const errorMessage = 'Authentication failed: no user data returned';
+        return { error: new Error(errorMessage) as AuthError };
       }
     } catch (error) {
       console.error('❌ Unexpected error in signIn:', {
         message: error instanceof Error ? error.message : String(error),
         error
       });
+      clearTimeout(hardTimeoutId);
       setLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during sign in';
+      return { error: new Error(errorMessage) as AuthError };
     }
-    clearTimeout(hardTimeoutId);
-    setTimeout(() => toast.success('Signed in successfully'), 0);
-    return { error: null };
   }, [fetchProfile]);
 
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
