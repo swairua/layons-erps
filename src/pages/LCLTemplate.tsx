@@ -34,6 +34,7 @@ export default function LCLTemplate() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
 
   // BOQ Header fields
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -63,6 +64,7 @@ export default function LCLTemplate() {
     }
 
     setLoading(true);
+    setTemplateError(null);
     console.log(`[LCLTemplate] Loading LCL BOQ data for company: ${companyId}`);
     try {
       // Phase 1: Load structures (critical path blocker)
@@ -77,13 +79,9 @@ export default function LCLTemplate() {
         const structureNames = structures.length > 0
           ? structures.map((s) => s.name).join(', ')
           : 'none';
-        const errorMsg = `LCL Default BOQ structure not found. Found ${structures.length} structure(s): ${structureNames}`;
+        const errorMsg = `The LCL Default BOQ template structure is missing. Found ${structures.length} structure(s): ${structureNames}. Please contact your administrator to set up the required template structure.`;
         console.error(`[LCLTemplate] ${errorMsg}`);
-        toast({
-          title: 'Error',
-          description: errorMsg,
-          variant: 'destructive',
-        });
+        setTemplateError(errorMsg);
         setLoading(false);
         return;
       }
@@ -115,17 +113,13 @@ export default function LCLTemplate() {
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load LCL BOQ';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load LCL BOQ template';
       console.error(`[LCLTemplate] Error loading LCL BOQ for company ${companyId}:`, error);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      setTemplateError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, hierarchicalData]);
 
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
@@ -378,6 +372,34 @@ export default function LCLTemplate() {
         <div className="text-center space-y-2">
           <p className="text-muted-foreground">Loading LCL BOQ...</p>
           {isCompanyLoading && <p className="text-xs text-muted-foreground/70">Waiting for company context...</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (templateError) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Unable to Load Template</h2>
+            <p className="text-muted-foreground mb-4">{templateError}</p>
+          </div>
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="default"
+              onClick={() => {
+                setTemplateError(null);
+                loadLCLBOQData();
+              }}
+            >
+              Retry
+            </Button>
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>
+              Go to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );
