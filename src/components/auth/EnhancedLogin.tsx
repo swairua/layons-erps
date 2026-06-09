@@ -22,12 +22,6 @@ export function EnhancedLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    toast.success('Ready to sign in', {
-      description: 'Enter your credentials to access the system',
-      duration: 3000
-    });
-  }, []);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};

@@ -59,9 +59,6 @@ export default function FixedBOQ() {
         .order('sort_order', { ascending: true });
       if (error) throw error;
       setItems((data as FixedBOQItem[]) || []);
-      if ((data || []).length === 0) {
-        toast.info('No Fixed BOQ items found for this company');
-      }
     } catch (err) {
       console.warn('Failed to load fixed_boq_items:', err);
       toast.error('Failed to load Fixed BOQ items');
