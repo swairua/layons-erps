@@ -296,7 +296,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             );
           }
         }
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
         // Debounce: verify session is truly gone before clearing state
         // Prevents transient auto-refresh failures from logging the user out
         await new Promise(resolve => setTimeout(resolve, 400));
