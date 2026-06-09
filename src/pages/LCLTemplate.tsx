@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { LCLHierarchicalData } from '@/types/lclTemplate';
@@ -26,6 +27,7 @@ export default function LCLTemplate() {
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
   const { data: customers } = useCustomers(companyId);
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
   console.log(`[LCLTemplate] Company context loaded - isLoading: ${isCompanyLoading}, companyId: "${companyId}", currentCompany: ${currentCompany ? currentCompany.name : 'null'}`);
 
@@ -365,6 +367,17 @@ export default function LCLTemplate() {
       console.log('[LCLTemplate] ✅ Header fields restored from draft');
     }
   }, [hierarchicalData]);
+
+  // Show auth-flashing guard while session is still being restored
+  if (authLoading && !isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-2">
+          <p className="text-muted-foreground">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || isCompanyLoading) {
     return (

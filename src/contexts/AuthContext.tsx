@@ -342,11 +342,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    // CRITICAL: Ensure initialization completes within 1.5 seconds no matter what
+    // CRITICAL: Ensure initialization completes within 5 seconds no matter what
     const hardTimeout = setTimeout(() => {
       console.warn('⚠️ Hard timeout: completing initialization');
       completeInit();
-    }, 1500);
+    }, 5000);
 
     const initializeAuthState = async () => {
       try {
@@ -360,9 +360,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.warn('⚠️ [AuthContext] Cannot access localStorage:', e instanceof Error ? e.message : String(e));
         }
 
-        // Simple session check with timeout
+        // Simple session check with generous timeout (Supabase may need to refresh the token)
         const sessionTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 500);
+          setTimeout(() => reject(new Error('Session check timeout')), 3000);
         });
 
         try {
@@ -379,6 +379,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               hasRefreshToken: !!sessionData.session.refresh_token,
               expiresAt: sessionData.session.expires_at
             });
+
+            // Explicitly set the session on the Supabase client to ensure auth headers
+            // are wired for subsequent API calls
+            try {
+              await supabase.auth.setSession({
+                access_token: sessionData.session.access_token,
+                refresh_token: sessionData.session.refresh_token,
+              });
+              console.log('✅ [AuthContext] Session explicitly set on Supabase client');
+            } catch (setSessionError) {
+              console.warn('⚠️ [AuthContext] Could not re-set session:', setSessionError instanceof Error ? setSessionError.message : String(setSessionError));
+            }
+
             setSession(sessionData.session);
             setUser(sessionData.session.user);
 
