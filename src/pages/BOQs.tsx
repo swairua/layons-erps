@@ -46,7 +46,7 @@ export default function BOQs() {
   const { currentCompany } = useCurrentCompany();
   const { profile } = useAuth();
   const companyId = currentCompany?.id;
-  const { data: boqs = [], isLoading, refetch: refetchBOQs } = useBOQs(companyId);
+  const { data: boqs = [], isLoading, refetch: refetchBOQs, error: boqsError } = useBOQs(companyId);
   const { useAuditedDeleteBOQ } = useAuditedDeleteOperations();
   const deleteBOQ = useAuditedDeleteBOQ(companyId || '');
   const { data: units = [] } = useUnits(companyId);
@@ -192,6 +192,37 @@ export default function BOQs() {
       }
     }
   };
+
+  // Show error toast if BOQs query fails
+  useEffect(() => {
+    if (boqsError) {
+      console.error('❌ BOQs query error:', boqsError);
+      toast.error('Failed to load BOQs', {
+        description: boqsError instanceof Error ? boqsError.message : 'An error occurred while loading BOQs',
+        duration: 5000
+      });
+    }
+  }, [boqsError]);
+
+  // Debug logging for query state and company
+  useEffect(() => {
+    console.log('📊 BOQs Query Debug Info:', {
+      currentCompanyId: companyId,
+      isLoading,
+      hasError: !!boqsError,
+      boqsCount: boqs.length,
+      boqsQuery: 'SELECT * FROM boqs WHERE company_id = ?',
+      timestamp: new Date().toISOString()
+    });
+    if (boqs.length > 0) {
+      console.log('📋 First BOQ sample:', {
+        id: boqs[0].id,
+        number: boqs[0].number,
+        company_id: boqs[0].company_id,
+        client: boqs[0].client_name
+      });
+    }
+  }, [companyId, isLoading, boqsError, boqs]);
 
   const handleDeleteSingleDraft = async (draft: any) => {
     if (!profile?.id || !companyId) return;
@@ -577,6 +608,33 @@ export default function BOQs() {
 
       {schemaError && (
         <BOQConversionFix />
+      )}
+
+      {boqsError && (
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-destructive mb-1">Failed to Load BOQs</p>
+                <p className="text-sm text-muted-foreground">
+                  {boqsError instanceof Error ? boqsError.message : 'An error occurred while loading BOQs. Please try again.'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Company ID: <code className="bg-muted px-1 py-0.5 rounded">{companyId || 'not loaded'}</code>
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetchBOQs()}
+                className="flex-shrink-0"
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters and Search */}
