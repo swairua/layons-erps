@@ -139,6 +139,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
   const [previousTermsLoaded, setPreviousTermsLoaded] = useState(false);
   const [showCalculatedValuesInTerms, setShowCalculatedValuesInTerms] = useState(false);
   const [currency, setCurrency] = useState(currentCompany?.currency || 'KES');
+  const [taxAmount, setTaxAmount] = useState<number | ''>('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [boqStatus, setBoqStatus] = useState('draft');
   const [sections, setSections] = useState<BOQSectionRow[]>([defaultSection()]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -218,6 +221,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
               setTermsAndConditions(draft.terms_and_conditions || termsAndConditions);
               setShowCalculatedValuesInTerms(draft.showCalculatedValuesInTerms || false);
               setCurrency(draft.currency || currency);
+              setTaxAmount(draft.tax_amount || '');
+              setAttachmentUrl(draft.attachment_url || '');
+              setBoqStatus(draft.status || 'draft');
               setSections(draft.data?.sections || sections);
               setLastAutosavedAt(draft.last_autosaved_at || null);
             }
@@ -288,6 +294,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         termsAndConditions: formData.termsAndConditions,
         showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms,
         currency: formData.currency,
+        taxAmount: formData.taxAmount,
+        attachmentUrl: formData.attachmentUrl,
+        boqStatus: formData.boqStatus,
         sections: formData.sections,
       }, draftTokenRef.current);
 
@@ -344,16 +353,19 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
       termsAndConditions,
       showCalculatedValuesInTerms,
       currency,
+      taxAmount,
+      attachmentUrl,
+      boqStatus,
       sections,
     };
-  }, [boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections]);
+  }, [boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, taxAmount, attachmentUrl, boqStatus, sections]);
 
   // Autosave whenever form state changes (after hydration is complete)
   useEffect(() => {
     if (open && draftLoaded && Object.keys(formStateRef.current).length > 0) {
       debouncedAutoSave();
     }
-  }, [open, draftLoaded, boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections, debouncedAutoSave]);
+  }, [open, draftLoaded, boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, taxAmount, attachmentUrl, boqStatus, sections, debouncedAutoSave]);
 
   // Helper to mark changes and clear any previous errors for auto-retry
   const markChanged = useCallback(() => {
@@ -475,8 +487,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
   const totals = useMemo(() => {
     let subtotal = 0;
     sections.forEach(sec => { subtotal += calculateSectionTotal(sec); });
-    return { subtotal };
-  }, [sections]);
+    const tax = typeof taxAmount === 'number' ? taxAmount : 0;
+    return { subtotal, tax, total: subtotal + tax };
+  }, [sections, taxAmount]);
 
   const isItemEmpty = (item: BOQItemRow): boolean => {
     return !item.description.trim() && (item.quantity === '' || item.quantity === 0) && (item.rate === '' || item.rate === 0);
