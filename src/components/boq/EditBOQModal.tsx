@@ -322,7 +322,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
 
           const termsToUse = dataToUse.terms_and_conditions || '';
           setTermsAndConditions(termsToUse);
-          const showCalcValues = dataToUse.showCalculatedValuesInTerms || false;
+          const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
           setShowCalculatedValuesInTerms(showCalcValues);
 
           const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
@@ -611,7 +611,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         total_amount: filledSubtotal,
         data: doc,
         terms_and_conditions: termsAndConditions || null,
-        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);
