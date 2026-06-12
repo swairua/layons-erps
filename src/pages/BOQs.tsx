@@ -46,7 +46,7 @@ export default function BOQs() {
   const { currentCompany } = useCurrentCompany();
   const { profile } = useAuth();
   const companyId = currentCompany?.id;
-  const { data: boqs = [], isLoading, refetch: refetchBOQs } = useBOQs(companyId);
+  const { data: boqs = [], isLoading, refetch: refetchBOQs, error: boqsError } = useBOQs(companyId);
   const { useAuditedDeleteBOQ } = useAuditedDeleteOperations();
   const deleteBOQ = useAuditedDeleteBOQ(companyId || '');
   const { data: units = [] } = useUnits(companyId);
@@ -61,31 +61,42 @@ export default function BOQs() {
   const [createDrafts, setCreateDrafts] = useState<any[]>([]);
   const [continueDraftToken, setContinueDraftToken] = useState<string | null>(null);
 
-  // Helper function to refresh linked BOQ IDs
+  // Helper function to refresh linked BOQ IDs (with timeout to prevent blocking)
   const refreshLinkedBOQIds = async () => {
     if (!companyId) return;
     try {
-      const { data, error } = await supabase
+      // Wrap in Promise.race to timeout after 5 seconds
+      const fetchPromise = supabase
         .from('lcl_boqs')
         .select('boq_id')
         .eq('company_id', companyId)
         .not('boq_id', 'is', null);
 
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Linked BOQs fetch timeout')), 5000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
       if (error) {
-        console.error('Failed to fetch linked BOQ IDs:', error);
+        console.warn('⚠️ Failed to fetch linked BOQ IDs (continuing):', error);
         return;
       }
 
       const ids = new Set(data?.map((record: any) => record.boq_id).filter(Boolean) || []);
       setLinkedBOQIds(ids);
     } catch (err) {
-      console.error('Error fetching linked BOQ IDs:', err);
+      console.warn('⚠️ Error fetching linked BOQ IDs (continuing):', err);
+      // Continue without linked BOQ data - don't block the page
     }
   };
 
-  // Fetch linked BOQ IDs from lcl_boqs table
+  // Fetch linked BOQ IDs from lcl_boqs table (debounced to avoid race conditions)
   useEffect(() => {
-    refreshLinkedBOQIds();
+    const timer = setTimeout(() => {
+      refreshLinkedBOQIds();
+    }, 500); // Delay to let primary queries complete first
+    return () => clearTimeout(timer);
   }, [companyId]);
 
   // Set status filter from URL params
@@ -96,12 +107,23 @@ export default function BOQs() {
     }
   }, [searchParams]);
 
-  // Fetch all create drafts when company changes
+  // Fetch all create drafts when company changes (with timeout to prevent blocking)
   useEffect(() => {
     const checkForDrafts = async () => {
       if (companyId && profile?.id) {
-        const drafts = await listCreateDrafts(profile.id, companyId);
-        setCreateDrafts(drafts);
+        try {
+          // Wrap in Promise.race to timeout after 5 seconds
+          const draftsPromise = listCreateDrafts(profile.id, companyId);
+          const timeoutPromise = new Promise<any[]>((_, reject) =>
+            setTimeout(() => reject(new Error('Draft fetch timeout')), 5000)
+          );
+          const drafts = await Promise.race([draftsPromise, timeoutPromise]);
+          setCreateDrafts(drafts);
+        } catch (err) {
+          console.warn('⚠️ Failed to load create drafts (continuing without):', err);
+          // Continue without drafts - don't block the page
+          setCreateDrafts([]);
+        }
       }
     };
 
@@ -162,8 +184,17 @@ export default function BOQs() {
 
   const refreshCreateDrafts = useCallback(async () => {
     if (companyId && profile?.id) {
-      const drafts = await listCreateDrafts(profile.id, companyId);
-      setCreateDrafts(drafts);
+      try {
+        const draftsPromise = listCreateDrafts(profile.id, companyId);
+        const timeoutPromise = new Promise<any[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Draft refresh timeout')), 5000)
+        );
+        const drafts = await Promise.race([draftsPromise, timeoutPromise]);
+        setCreateDrafts(drafts);
+      } catch (err) {
+        console.warn('⚠️ Failed to refresh create drafts:', err);
+        // Continue without refreshing - don't block interactions
+      }
     }
   }, [companyId, profile?.id]);
 
@@ -192,6 +223,37 @@ export default function BOQs() {
       }
     }
   };
+
+  // Show error toast if BOQs query fails
+  useEffect(() => {
+    if (boqsError) {
+      console.error('❌ BOQs query error:', boqsError);
+      toast.error('Failed to load BOQs', {
+        description: boqsError instanceof Error ? boqsError.message : 'An error occurred while loading BOQs',
+        duration: 5000
+      });
+    }
+  }, [boqsError]);
+
+  // Debug logging for query state and company
+  useEffect(() => {
+    console.log('📊 BOQs Query Debug Info:', {
+      currentCompanyId: companyId,
+      isLoading,
+      hasError: !!boqsError,
+      boqsCount: boqs.length,
+      boqsQuery: 'SELECT * FROM boqs WHERE company_id = ?',
+      timestamp: new Date().toISOString()
+    });
+    if (boqs.length > 0) {
+      console.log('📋 First BOQ sample:', {
+        id: boqs[0].id,
+        number: boqs[0].number,
+        company_id: boqs[0].company_id,
+        client: boqs[0].client_name
+      });
+    }
+  }, [companyId, isLoading, boqsError, boqs]);
 
   const handleDeleteSingleDraft = async (draft: any) => {
     if (!profile?.id || !companyId) return;
@@ -577,6 +639,33 @@ export default function BOQs() {
 
       {schemaError && (
         <BOQConversionFix />
+      )}
+
+      {boqsError && (
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-destructive mb-1">Failed to Load BOQs</p>
+                <p className="text-sm text-muted-foreground">
+                  {boqsError instanceof Error ? boqsError.message : 'An error occurred while loading BOQs. Please try again.'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Company ID: <code className="bg-muted px-1 py-0.5 rounded">{companyId || 'not loaded'}</code>
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetchBOQs()}
+                className="flex-shrink-0"
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters and Search */}
