@@ -613,7 +613,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         attachment_url: null,
         data: { ...insertedDoc, number: currentNumber },
         terms_and_conditions: termsAndConditions || null,
-        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
       };
 
@@ -661,7 +661,12 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
     }
 
     try {
-      await downloadBOQPDF(insertedDoc, currentCompany ? {
+      const docForPdf = {
+        ...insertedDoc,
+        terms_and_conditions: termsAndConditions || undefined,
+        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+      };
+      await downloadBOQPDF(docForPdf, currentCompany ? {
         name: currentCompany.name,
         logo_url: currentCompany.logo_url || undefined,
         address: currentCompany.address || undefined,

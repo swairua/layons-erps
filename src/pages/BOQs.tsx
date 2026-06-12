@@ -307,7 +307,7 @@ export default function BOQs() {
 
       // Use ONLY top-level columns for terms (single source of truth)
       const termsToUse = boqToUse.terms_and_conditions || '';
-      const showCalculatedValues = boqToUse.showCalculatedValuesInTerms || false;
+      const showCalculatedValues = boqToUse.show_calculated_values_in_terms || false;
 
       // Log term retrieval for diagnostics
       console.log('BOQ Terms Retrieval Diagnostic:', {
@@ -316,7 +316,7 @@ export default function BOQs() {
         hasTopLevelTerms: !!boqToUse.terms_and_conditions,
         topLevelTermsLength: boqToUse.terms_and_conditions?.length || 0,
         finalTermsLength: termsToUse.length,
-        topLevelShowCalcValues: boqToUse.showCalculatedValuesInTerms,
+        topLevelShowCalcValues: boqToUse.show_calculated_values_in_terms,
         finalShowCalcValues: showCalculatedValues,
       });
 
@@ -885,20 +885,6 @@ export default function BOQs() {
                             >
                               <Download className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
-                            {b.number === 'BOQ-20251124-1441' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs"
-                                onClick={() => {
-                                  setPercentageRateBoq(b);
-                                  setPercentageRateOpen(true);
-                                }}
-                                title="Download Special Invoice PDF"
-                              >
-                                Invoice
-                              </Button>
-                            )}
                             <Button
                               size="icon"
                               variant="outline"
