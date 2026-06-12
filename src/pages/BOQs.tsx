@@ -61,31 +61,42 @@ export default function BOQs() {
   const [createDrafts, setCreateDrafts] = useState<any[]>([]);
   const [continueDraftToken, setContinueDraftToken] = useState<string | null>(null);
 
-  // Helper function to refresh linked BOQ IDs
+  // Helper function to refresh linked BOQ IDs (with timeout to prevent blocking)
   const refreshLinkedBOQIds = async () => {
     if (!companyId) return;
     try {
-      const { data, error } = await supabase
+      // Wrap in Promise.race to timeout after 5 seconds
+      const fetchPromise = supabase
         .from('lcl_boqs')
         .select('boq_id')
         .eq('company_id', companyId)
         .not('boq_id', 'is', null);
 
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Linked BOQs fetch timeout')), 5000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
       if (error) {
-        console.error('Failed to fetch linked BOQ IDs:', error);
+        console.warn('⚠️ Failed to fetch linked BOQ IDs (continuing):', error);
         return;
       }
 
       const ids = new Set(data?.map((record: any) => record.boq_id).filter(Boolean) || []);
       setLinkedBOQIds(ids);
     } catch (err) {
-      console.error('Error fetching linked BOQ IDs:', err);
+      console.warn('⚠️ Error fetching linked BOQ IDs (continuing):', err);
+      // Continue without linked BOQ data - don't block the page
     }
   };
 
-  // Fetch linked BOQ IDs from lcl_boqs table
+  // Fetch linked BOQ IDs from lcl_boqs table (debounced to avoid race conditions)
   useEffect(() => {
-    refreshLinkedBOQIds();
+    const timer = setTimeout(() => {
+      refreshLinkedBOQIds();
+    }, 500); // Delay to let primary queries complete first
+    return () => clearTimeout(timer);
   }, [companyId]);
 
   // Set status filter from URL params
@@ -96,12 +107,23 @@ export default function BOQs() {
     }
   }, [searchParams]);
 
-  // Fetch all create drafts when company changes
+  // Fetch all create drafts when company changes (with timeout to prevent blocking)
   useEffect(() => {
     const checkForDrafts = async () => {
       if (companyId && profile?.id) {
-        const drafts = await listCreateDrafts(profile.id, companyId);
-        setCreateDrafts(drafts);
+        try {
+          // Wrap in Promise.race to timeout after 5 seconds
+          const draftsPromise = listCreateDrafts(profile.id, companyId);
+          const timeoutPromise = new Promise<any[]>((_, reject) =>
+            setTimeout(() => reject(new Error('Draft fetch timeout')), 5000)
+          );
+          const drafts = await Promise.race([draftsPromise, timeoutPromise]);
+          setCreateDrafts(drafts);
+        } catch (err) {
+          console.warn('⚠️ Failed to load create drafts (continuing without):', err);
+          // Continue without drafts - don't block the page
+          setCreateDrafts([]);
+        }
       }
     };
 
@@ -162,8 +184,17 @@ export default function BOQs() {
 
   const refreshCreateDrafts = useCallback(async () => {
     if (companyId && profile?.id) {
-      const drafts = await listCreateDrafts(profile.id, companyId);
-      setCreateDrafts(drafts);
+      try {
+        const draftsPromise = listCreateDrafts(profile.id, companyId);
+        const timeoutPromise = new Promise<any[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Draft refresh timeout')), 5000)
+        );
+        const drafts = await Promise.race([draftsPromise, timeoutPromise]);
+        setCreateDrafts(drafts);
+      } catch (err) {
+        console.warn('⚠️ Failed to refresh create drafts:', err);
+        // Continue without refreshing - don't block interactions
+      }
     }
   }, [companyId, profile?.id]);
 
