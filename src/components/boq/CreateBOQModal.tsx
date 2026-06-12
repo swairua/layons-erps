@@ -216,7 +216,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
               setContractor(draft.contractor || '');
               setNotes(draft.data?.notes || '');
               setTermsAndConditions(draft.terms_and_conditions || termsAndConditions);
-              setShowCalculatedValuesInTerms(draft.showCalculatedValuesInTerms || false);
+              setShowCalculatedValuesInTerms(draft.show_calculated_values_in_terms || false);
               setCurrency(draft.currency || currency);
               setSections(draft.data?.sections || sections);
               setLastAutosavedAt(draft.last_autosaved_at || null);
@@ -612,8 +612,8 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         total_amount: filledSubtotal,
         attachment_url: null,
         data: { ...insertedDoc, number: currentNumber },
-        termsAndConditions: termsAndConditions || null,
-        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        terms_and_conditions: termsAndConditions || null,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
       };
 

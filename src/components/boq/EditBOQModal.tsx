@@ -320,9 +320,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
           setContractor(dataToUse.contractor || boqData.contractor || '');
           setNotes(boqData.notes || '');
 
-          const termsToUse = dataToUse.termsAndConditions || '';
+          const termsToUse = dataToUse.terms_and_conditions || '';
           setTermsAndConditions(termsToUse);
-          const showCalcValues = dataToUse.showCalculatedValuesInTerms || false;
+          const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
           setShowCalculatedValuesInTerms(showCalcValues);
 
           const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
@@ -610,8 +610,8 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         tax_amount: 0,
         total_amount: filledSubtotal,
         data: doc,
-        termsAndConditions: termsAndConditions || null,
-        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        terms_and_conditions: termsAndConditions || null,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);

@@ -46,7 +46,7 @@ export interface BOQDraftRecord {
   total_amount: number;
   data: any;
   terms_and_conditions: string;
-  showCalculatedValuesInTerms: boolean;
+  show_calculated_values_in_terms: boolean;
   created_at: string;
   updated_at: string;
   last_autosaved_at: string;
@@ -96,8 +96,8 @@ export async function saveBoqDraft(
         sections: formData.sections,
         notes: formData.notes,
       },
-      termsAndConditions: formData.termsAndConditions || null,
-      showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
+      terms_and_conditions: formData.termsAndConditions || null,
+      show_calculated_values_in_terms: formData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
@@ -356,8 +356,8 @@ export async function publishDraft(
       total_amount: draft.total_amount,
       attachment_url: null,
       data: draft.data,
-      termsAndConditions: draft.termsAndConditions,
-      showCalculatedValuesInTerms: draft.showCalculatedValuesInTerms,
+      terms_and_conditions: draft.terms_and_conditions,
+      show_calculated_values_in_terms: draft.show_calculated_values_in_terms,
       created_by: createdByUserId || null,
     };
 
@@ -430,8 +430,8 @@ export async function saveEditingDraft(
       tax_amount: boqData.tax_amount || 0,
       total_amount: boqData.total_amount || 0,
       data: boqData.data,
-      termsAndConditions: boqData.termsAndConditions || null,
-      showCalculatedValuesInTerms: boqData.showCalculatedValuesInTerms || false,
+      terms_and_conditions: boqData.terms_and_conditions || boqData.termsAndConditions || null,
+      show_calculated_values_in_terms: boqData.show_calculated_values_in_terms || boqData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };

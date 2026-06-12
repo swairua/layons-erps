@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,8 @@ import { BOQDraftRecord } from '@/services/boqAutoSaveService';
 import { BOQ_STATUS, sanitizeBOQStatus } from '@/utils/boqConstants';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
+
+type BOQ = Database['public']['Tables']['boqs']['Row'];
 
 export default function BOQs() {
   const [searchParams] = useSearchParams();
@@ -136,7 +139,7 @@ export default function BOQs() {
   }, [companyId, profile?.id]);
 
   // Categorize BOQs by due date status
-  const categorizeBOQ = (boq: any) => {
+  const categorizeBOQ = (boq: BOQ) => {
     if (!boq.due_date) return 'current';
 
     const today = new Date();
@@ -160,7 +163,7 @@ export default function BOQs() {
   };
 
   // Filter and search logic
-  const filteredBOQs = boqs.filter(boq => {
+  const filteredBOQs: BOQ[] = boqs.filter(boq => {
     // Search filter (guard against undefined/null values)
     const search = searchTerm.toLowerCase();
     const matchesSearch =
@@ -274,7 +277,7 @@ export default function BOQs() {
     }
   }, [companyId, isLoading, boqsError, boqs]);
 
-  const handleDeleteSingleDraft = async (draft: any) => {
+  const handleDeleteSingleDraft = async (draft: BOQDraftRecord) => {
     if (!profile?.id || !companyId) return;
     if (!draft.draft_token) { toast.error('Cannot delete draft without a token'); return; }
     const result = await deleteDraft(profile.id, companyId, draft.draft_token);
@@ -290,7 +293,7 @@ export default function BOQs() {
   const pagination = usePagination(filteredBOQs, { initialPageSize: 10 });
   const paginatedBOQs = pagination.paginatedItems;
 
-  const handleDownloadPDF = async (boq: any, options?: { customTitle?: string; amountMultiplier?: number; forceCurrency?: string; customClient?: any; stampImageUrl?: string; specialPaymentPercentage?: number; invoiceNumber?: string; useCurrentDate?: boolean }) => {
+  const handleDownloadPDF = async (boq: BOQ, options?: { customTitle?: string; amountMultiplier?: number; forceCurrency?: string; customClient?: any; stampImageUrl?: string; specialPaymentPercentage?: number; invoiceNumber?: string; useCurrentDate?: boolean }) => {
     try {
       if (!boq || !boq.data) {
         toast.error('BOQ data is not available');
@@ -326,7 +329,7 @@ export default function BOQs() {
 
       // Use ONLY top-level columns for terms (single source of truth)
       const termsToUse = boqToUse.terms_and_conditions || '';
-      const showCalculatedValues = boqToUse.showCalculatedValuesInTerms || false;
+      const showCalculatedValues = boqToUse.show_calculated_values_in_terms || false;
 
       // Log term retrieval for diagnostics
       console.log('BOQ Terms Retrieval Diagnostic:', {
@@ -335,7 +338,7 @@ export default function BOQs() {
         hasTopLevelTerms: !!boqToUse.terms_and_conditions,
         topLevelTermsLength: boqToUse.terms_and_conditions?.length || 0,
         finalTermsLength: termsToUse.length,
-        topLevelShowCalcValues: boqToUse.showCalculatedValuesInTerms,
+        topLevelShowCalcValues: boqToUse.show_calculated_values_in_terms,
         finalShowCalcValues: showCalculatedValues,
       });
 
@@ -353,7 +356,7 @@ export default function BOQs() {
           country: boqToUse.client_country || undefined,
         },
         terms_and_conditions: termsToUse,
-        showCalculatedValuesInTerms: showCalculatedValues,
+        show_calculated_values_in_terms: showCalculatedValues,
         contractor: boqToUse.data?.contractor,
         project_title: boqToUse.project_title || boqToUse.data?.project_title,
         notes: boqToUse.data?.notes,
@@ -876,13 +879,15 @@ export default function BOQs() {
                       <TableHead className="hidden md:table-cell text-xs md:text-sm">Contractor</TableHead>
                       <TableHead className="text-xs md:text-sm">Currency</TableHead>
                       <TableHead className="text-xs md:text-sm">Status</TableHead>
+                      <TableHead className="hidden lg:table-cell text-right text-xs md:text-sm">Subtotal</TableHead>
+                      <TableHead className="hidden lg:table-cell text-right text-xs md:text-sm">Tax</TableHead>
                       <TableHead className="text-right text-xs md:text-sm">Total</TableHead>
                       <TableHead className="hidden lg:table-cell text-xs md:text-sm">Created By</TableHead>
                       <TableHead className="text-xs md:text-sm">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedBOQs.map((b: any) => (
+                    {paginatedBOQs.map((b: BOQ) => (
                       <TableRow key={b.id}>
                         <TableCell className="text-xs md:text-sm">{b.number}</TableCell>
                         <TableCell className="text-xs md:text-sm">{new Date(b.boq_date).toLocaleDateString()}</TableCell>
@@ -916,6 +921,8 @@ export default function BOQs() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.subtotal || 0))}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.tax_amount || 0))}</TableCell>
                         <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
                         <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.created_by ? '✓' : '-'}</TableCell>
                         <TableCell>
