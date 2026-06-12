@@ -59,6 +59,7 @@ export default function BOQs() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string }>({ open: false });
   const [convertDialog, setConvertDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string; isLCL?: boolean }>({ open: false });
   const [createDrafts, setCreateDrafts] = useState<any[]>([]);
+  const [continueDraftToken, setContinueDraftToken] = useState<string | null>(null);
 
   // Helper function to refresh linked BOQ IDs
   const refreshLinkedBOQIds = async () => {
@@ -189,6 +190,18 @@ export default function BOQs() {
       } else {
         toast.error('Failed to reset some drafts');
       }
+    }
+  };
+
+  const handleDeleteSingleDraft = async (draft: any) => {
+    if (!profile?.id || !companyId) return;
+    if (!draft.draft_token) { toast.error('Cannot delete draft without a token'); return; }
+    const result = await deleteDraft(profile.id, companyId, draft.draft_token);
+    if (result.success) {
+      setCreateDrafts(prev => prev.filter(d => d.draft_token !== draft.draft_token));
+      toast.success('Draft deleted');
+    } else {
+      toast.error('Failed to delete draft');
     }
   };
 
@@ -508,41 +521,56 @@ export default function BOQs() {
 
       {createDrafts.length > 0 && (
         <Card className="border-blue-200 bg-blue-50 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-blue-900 text-sm md:text-base">
-                    {createDrafts.length === 1
-                      ? 'You have an unsaved BOQ in progress'
-                      : `You have ${createDrafts.length} unsaved BOQs in progress`}
-                  </p>
-                  <p className="text-xs md:text-sm text-blue-700">
-                    Last saved: {new Date(createDrafts[0].last_autosaved_at).toLocaleString()}
-                  </p>
+          <CardContent className="pt-4 pb-4">
+            <p className="font-medium text-blue-900 text-sm mb-3">
+              {createDrafts.length === 1
+                ? 'Unsaved BOQ draft'
+                : `Unsaved BOQ drafts (${createDrafts.length})`}
+            </p>
+            <div className="space-y-2">
+              {createDrafts.map(draft => (
+                <div key={draft.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 border border-blue-100">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-blue-900 text-sm truncate">
+                        {draft.number || 'Unnumbered'}{draft.client_name ? ` — ${draft.client_name}` : ''}
+                      </p>
+                      <p className="text-xs text-blue-600 truncate">
+                        {draft.project_title || 'No project title'}
+                        <span className="text-blue-400 ml-2">
+                          {new Date(draft.last_autosaved_at).toLocaleString()}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0 ml-3">
+                    <Button
+                      size="sm"
+                      onClick={() => { setContinueDraftToken(draft.draft_token); setOpen(true); }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                    >
+                      Continue
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteSingleDraft(draft)}
+                      className="border-blue-200 hover:bg-blue-100 h-8 text-xs"
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2 flex-col sm:flex-row w-full md:w-auto">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setOpen(true);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
-                >
-                  Continue Editing
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleResetDraft}
-                  className="border-blue-200 hover:bg-blue-100 w-full sm:w-auto"
-                >
-                  Reset {createDrafts.length > 1 ? 'All Drafts' : 'Draft'}
-                </Button>
-              </div>
+              ))}
             </div>
+            {createDrafts.length > 1 && (
+              <div className="mt-3 text-right">
+                <Button size="sm" variant="ghost" onClick={handleResetDraft} className="text-blue-700 hover:text-blue-900 h-8 text-xs">
+                  Reset All Drafts
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -823,9 +851,10 @@ export default function BOQs() {
         </CardContent>
       </Card>
 
-      <CreateBOQModal open={open} onOpenChange={(newOpen) => {
+      <CreateBOQModal open={open} initialDraftToken={continueDraftToken} onOpenChange={(newOpen) => {
         setOpen(newOpen);
         if (!newOpen) {
+          setContinueDraftToken(null);
           refreshCreateDrafts();
         }
       }} onSuccess={() => {

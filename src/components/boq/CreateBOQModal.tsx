@@ -48,6 +48,7 @@ interface CreateBOQModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   company: any;
+  initialDraftToken?: string | null;
 }
 
 
@@ -96,7 +97,7 @@ const defaultSection = (): BOQSectionRow => ({
   ],
 });
 
-export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: CreateBOQModalProps) {
+export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initialDraftToken }: CreateBOQModalProps) {
   const currentCompany = company;
   const { data: customers = [] } = useCustomers(currentCompany?.id);
   const { data: units = [] } = useUnits(currentCompany?.id);
@@ -120,6 +121,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
   const lastProfileRef = useRef(profile);
   const formStateRef = useRef<any>({});
   const draftTokenRef = useRef<string>(generateSafeUUID());
+  const loadedDraftTokenRef = useRef<string | null>(null);
 
   const todayISO = new Date().toISOString().split('T')[0];
   const defaultNumber = useMemo(() => {
@@ -172,9 +174,14 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
 
   // Load draft from database when modal opens (after previous terms are loaded)
   useEffect(() => {
-    if (open && previousTermsLoaded && !draftLoaded && currentCompany?.id && profile?.id) {
+    if (open && previousTermsLoaded && currentCompany?.id && profile?.id) {
+      const needsLoad = !draftLoaded || (initialDraftToken && initialDraftToken !== loadedDraftTokenRef.current);
+      if (!needsLoad) return;
       const loadDraft = async () => {
         try {
+          if (initialDraftToken) {
+            draftTokenRef.current = initialDraftToken;
+          }
           const token = draftTokenRef.current;
           let draft = await loadBoqDraft(profile.id, currentCompany.id, token);
           // Fallback: no draft matched current token, try most recent
@@ -220,6 +227,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
           setHydrationError('Failed to load draft');
         } finally {
           setDraftLoaded(true);
+          loadedDraftTokenRef.current = draftTokenRef.current;
           setIsHydrating(false);
         }
       };
@@ -229,7 +237,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
       setDraftLoaded(true);
       setIsHydrating(false);
     }
-  }, [open, previousTermsLoaded, draftLoaded, currentCompany?.id, profile?.id]);
+  }, [open, previousTermsLoaded, draftLoaded, currentCompany?.id, profile?.id, initialDraftToken]);
 
   // Cleanup pending autosaves on unmount
   useEffect(() => {
@@ -520,75 +528,74 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
     }
 
     setSubmitting(true);
-    try {
-      const filledSections = getFilledItems();
+    const filledSections = getFilledItems();
 
-      // Calculate subtotal from filled items only
-      let filledSubtotal = 0;
-      filledSections.forEach(sec => {
-        sec.subsections.forEach(sub => {
-          sub.items.forEach(item => {
-            const qty = item.quantity === '' ? 0 : Number(item.quantity);
-            const rate = item.rate === '' ? 0 : Number(item.rate);
-            filledSubtotal += qty * rate;
-          });
+    // Calculate subtotal from filled items only
+    let filledSubtotal = 0;
+    filledSections.forEach(sec => {
+      sec.subsections.forEach(sub => {
+        sub.items.forEach(item => {
+          const qty = item.quantity === '' ? 0 : Number(item.quantity);
+          const rate = item.rate === '' ? 0 : Number(item.rate);
+          filledSubtotal += qty * rate;
         });
       });
+    });
 
-      const doc: BoqDocument = {
-        number: boqNumber,
-        date: boqDate,
-        currency: currency,
-        client: {
-          name: selectedClient.name,
-          email: selectedClient.email || undefined,
-          phone: selectedClient.phone || undefined,
-          address: selectedClient.address || undefined,
-          city: selectedClient.city || undefined,
-          country: selectedClient.country || undefined,
-        },
-        contractor: contractor || undefined,
-        project_title: projectTitle || undefined,
-        sections: filledSections.map(s => ({
-          title: s.title || undefined,
-          subsections: s.subsections.map(sub => ({
-            name: sub.name,
-            label: sub.label,
-            items: sub.items.map(i => {
-              // lookup unit name from units list
-              const unitObj = units.find((u: any) => u.id === i.unit);
-              return {
-                description: i.description,
-                quantity: i.quantity,
-                unit_id: i.unit || null,
-                unit_name: unitObj ? unitObj.name : i.unit || null,
-                rate: i.rate,
-              };
-            })
-          }))
-        })),
-        notes: notes || undefined,
-        // NOTE: Do NOT save terms to nested data - save only to top-level columns
-        // This ensures single source of truth for terms_and_conditions and show_calculated_values_in_terms
-      };
+    const doc: BoqDocument = {
+      number: boqNumber,
+      date: boqDate,
+      currency: currency,
+      client: {
+        name: selectedClient.name,
+        email: selectedClient.email || undefined,
+        phone: selectedClient.phone || undefined,
+        address: selectedClient.address || undefined,
+        city: selectedClient.city || undefined,
+        country: selectedClient.country || undefined,
+      },
+      contractor: contractor || undefined,
+      project_title: projectTitle || undefined,
+      sections: filledSections.map(s => ({
+        title: s.title || undefined,
+        subsections: s.subsections.map(sub => ({
+          name: sub.name,
+          label: sub.label,
+          items: sub.items.map(i => {
+            // lookup unit name from units list
+            const unitObj = units.find((u: any) => u.id === i.unit);
+            return {
+              description: i.description,
+              quantity: i.quantity,
+              unit_id: i.unit || null,
+              unit_name: unitObj ? unitObj.name : i.unit || null,
+              rate: i.rate,
+            };
+          })
+        }))
+      })),
+      notes: notes || undefined,
+      // NOTE: Do NOT save terms to nested data - save only to top-level columns
+      // This ensures single source of truth for terms_and_conditions and show_calculated_values_in_terms
+    };
 
-      // Validate required fields before inserting
-      if (!currentCompany?.id) {
-        console.error('Company ID is missing');
-        toast.error('Company information is missing');
-        return;
-      }
+    // Validate required fields before inserting
+    if (!currentCompany?.id) {
+      console.error('Company ID is missing');
+      toast.error('Company information is missing');
+      return;
+    }
 
-      if (!boqNumber) {
-        console.error('BOQ number is missing');
-        toast.error('BOQ number is required');
-        return;
-      }
+    let currentNumber = boqNumber;
+    let insertedId: string | null = null;
+    let insertedDoc: BoqDocument = doc;
+    const MAX_RETRIES = 3;
 
-      // Store BOQ in database
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      // Build payload with current number
       const payload = {
         company_id: currentCompany.id,
-        number: boqNumber,
+        number: currentNumber,
         boq_date: boqDate,
         due_date: dueDate,
         client_name: selectedClient.name,
@@ -604,17 +611,16 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
         tax_amount: 0,
         total_amount: filledSubtotal,
         attachment_url: null,
-        data: doc,
+        data: { ...insertedDoc, number: currentNumber },
         terms_and_conditions: termsAndConditions || null,
         showCalculatedValuesInTerms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
       };
 
-      console.log('[handleGenerate] Inserting BOQ with payload:', { number: payload.number, company_id: payload.company_id, total_amount: payload.total_amount });
+      console.log(`[handleGenerate] Attempt ${attempt + 1}: Inserting BOQ with number ${currentNumber}`);
 
       const { data: insertedBOQ, error: insertError } = await supabase.from('boqs').insert([payload]).select('id');
       if (insertError) {
-        // Extract error message from various error object formats
         let errorMsg = 'Unknown error';
         if (insertError instanceof Error) {
           errorMsg = insertError.message;
@@ -622,12 +628,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
           errorMsg = (insertError as any).message || (insertError as any).details || JSON.stringify(insertError);
         }
 
-        console.error('Failed to store BOQ - Full error object:', insertError);
-        console.error('Failed to store BOQ - Error message:', errorMsg);
-        console.log('BOQ Payload that failed:', JSON.stringify(payload, null, 2));
+        const isDuplicate = errorMsg.includes('duplicate') || errorMsg.includes('unique');
+        if (isDuplicate && attempt < MAX_RETRIES - 1) {
+          console.warn(`[handleGenerate] BOQ number "${currentNumber}" conflict, retrying with new number`);
+          invalidateBOQNumberCache(currentCompany.id);
+          currentNumber = await generateNextBOQNumber(existingBOQs, currentCompany.id);
+          setBoqNumber(currentNumber);
+          continue;
+        }
 
-        if (errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
-          toast.error(`BOQ number "${boqNumber}" already exists for this company`);
+        if (isDuplicate) {
+          toast.error(`BOQ number "${currentNumber}" already exists — please try again`);
         } else {
           toast.error(`Failed to save BOQ: ${errorMsg}`);
         }
@@ -640,7 +651,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
         return;
       }
 
-      await downloadBOQPDF(doc, currentCompany ? {
+      insertedId = insertedBOQ[0].id;
+      break;
+    }
+
+    if (!insertedId) {
+      toast.error('Failed to save BOQ — please try again');
+      return;
+    }
+
+    try {
+      await downloadBOQPDF(insertedDoc, currentCompany ? {
         name: currentCompany.name,
         logo_url: currentCompany.logo_url || undefined,
         address: currentCompany.address || undefined,
@@ -652,19 +673,23 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
         company_services: currentCompany.company_services || undefined,
       } : undefined);
 
-      toast.success(`BOQ ${boqNumber} generated and saved`);
+      toast.success(`BOQ ${currentNumber} generated and saved`);
 
-      // Invalidate BOQ number cache since a new BOQ was created
       if (currentCompany?.id) {
         invalidateBOQNumberCache(currentCompany.id);
       }
 
-      // Clear draft from database and reset form state after successful save
+      onSuccess?.();
+      handleOpenChange(false);
+    } catch (err) {
+      console.error('Failed to generate BOQ PDF', err);
+      toast.error('BOQ saved but failed to generate PDF. You can download it later from the BOQ list.');
+    } finally {
+      // Clear draft from database regardless of PDF outcome
       if (profile?.id && currentCompany?.id) {
         const deleteResult = await deleteDraft(profile.id, currentCompany.id, draftTokenRef.current);
         if (!deleteResult.success) {
           console.warn('Failed to delete draft after BOQ creation:', deleteResult.error);
-          toast.warning('BOQ created but draft cleanup failed — you may see it again next time');
         }
       }
 
@@ -674,13 +699,6 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: Creat
         pendingTimeoutRef.current = null;
       }
       formStateRef.current = {};
-
-      onSuccess?.();
-      handleOpenChange(false);
-    } catch (err) {
-      console.error('Failed to generate BOQ PDF or save', err);
-      toast.error('Failed to generate BOQ PDF or save to database');
-    } finally {
       setSubmitting(false);
     }
   };
