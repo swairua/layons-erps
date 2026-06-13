@@ -3,15 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { DashboardSummaryCards } from '@/components/dashboard/DashboardSummaryCards';
-import { useCompanies } from '@/hooks/useDatabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ReportsDashboard() {
-  const { data: companies } = useCompanies();
-  const currentCompany = companies?.[0];
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const { data: stats, isLoading } = useDashboardStats(currentCompany?.id, selectedMonth, selectedYear);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
